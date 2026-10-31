@@ -21,3 +21,15 @@ def listar_platillos(conn, restaurante_id):
         """,
         (restaurante_id,),
     ).fetchall()
+
+
+def platillos_por_ids(conn, restaurante_id, ids):
+    """Los platillos disponibles de ese restaurante cuyo id esté en la lista."""
+    return conn.execute(
+        """
+        SELECT id, nombre, precio
+        FROM restaurantes.platillos
+        WHERE restaurante_id = %s AND disponible AND id = ANY(%s)
+        """,
+        (restaurante_id, list(ids)),
+    ).fetchall()
