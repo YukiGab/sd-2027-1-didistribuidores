@@ -1,8 +1,9 @@
 import secrets
 
 from app import db
-from app.errores import Invalido, NoEncontrado
-from app.modulos.pedidos import repositorio
+from app.errores import Conflicto, Invalido, NoEncontrado
+from app.modulos.pagos import servicio as pagos
+from app.modulos.pedidos import eventos, repositorio
 from app.modulos.restaurantes import servicio as restaurantes
 from app.modulos.usuarios import servicio as usuarios
 
@@ -10,6 +11,13 @@ from app.modulos.usuarios import servicio as usuarios
 def _completo(conn, pedido):
     """El pedido junto con sus platillos."""
     return {**pedido, "platillos": repositorio.listar_platillos(conn, pedido["id"])}
+
+
+def _estado_actual(conn, pedido_id):
+    pedido = repositorio.obtener(conn, pedido_id)
+    if pedido is None:
+        raise NoEncontrado("Pedido no encontrado")
+    return pedido
 
 
 def crear_pedido(clave, usuario_id, restaurante_id, items):
@@ -61,7 +69,23 @@ def crear_pedido(clave, usuario_id, restaurante_id, items):
 
 def obtener_pedido(pedido_id):
     with db.conexion() as conn:
-        pedido = repositorio.obtener(conn, pedido_id)
+        return _completo(conn, _estado_actual(conn, pedido_id))
+
+
+def pagar_pedido(pedido_id):
+    """Paga un pedido. Devuelve (pedido, cambio). cambio es False si ya estaba pagado."""
+    with db.conexion() as conn:
+        # Revisar y cambiar en una sola instrucción: si dos peticiones llegan a la vez,
+        # solo una consigue el cambio. La otra espera, ve que ya no está PENDIENTE_PAGO
+        # y recibe 0 filas.
+        pedido = repositorio.cambiar_estado(conn, pedido_id, "PENDIENTE_PAGO", "PAGADO")
         if pedido is None:
-            raise NoEncontrado("Pedido no encontrado")
-        return _completo(conn, pedido)
+            actual = _estado_actual(conn, pedido_id)
+            if actual["estado"] in ("PAGADO", "ASIGNADO", "ENTREGADO"):
+                return _completo(conn, actual), False  # reintento: mismo resultado
+            raise Conflicto(f"No se puede pagar un pedido en estado {actual['estado']}")
+
+        # El cobro y el evento van en la MISMA transacción que el cambio de estado
+        pagos.cobrar(conn, pedido_id, pedido["total"])
+        eventos.registrar(conn, "pedido.pagado", pedido, {"total": float(pedido["total"])})
+        return _completo(conn, pedido), True

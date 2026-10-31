@@ -58,3 +58,19 @@ def listar_platillos(conn, pedido_id):
         """,
         (pedido_id,),
     ).fetchall()
+
+
+def cambiar_estado(conn, pedido_id, desde, hacia):
+    """Cambia el estado SOLO si el pedido sigue en el estado 'desde'.
+    Devuelve el pedido actualizado, o None si no estaba en ese estado.
+    Es la pieza que evita el problema de revisar y luego cambiar (TOCTOU):
+    la revisión y el cambio ocurren en una sola instrucción."""
+    return conn.execute(
+        f"""
+        UPDATE pedidos.pedidos
+        SET estado = %s, version = version + 1, actualizado_en = now()
+        WHERE id = %s AND estado = %s
+        RETURNING {COLUMNAS}
+        """,
+        (hacia, pedido_id, desde),
+    ).fetchone()

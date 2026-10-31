@@ -41,3 +41,9 @@ def crear_pedido(
 @router.get("/{pedido_id}")
 def obtener_pedido(pedido_id: UUID):
     return servicio.obtener_pedido(pedido_id)
+
+
+@router.post("/{pedido_id}/pago")
+def pagar_pedido(pedido_id: UUID):
+    pedido, _ = servicio.pagar_pedido(pedido_id)
+    return pedido

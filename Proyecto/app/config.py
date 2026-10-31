@@ -18,3 +18,7 @@ TIMEOUT_ASIGNACION_SEG = int(os.getenv("TIMEOUT_ASIGNACION_SEG", "1200"))
 
 # Cada cuántos segundos revisa la tarea de timeouts si hay pedidos vencidos
 REVISION_TIMEOUTS_SEG = int(os.getenv("REVISION_TIMEOUTS_SEG", "5"))
+
+# Mientras la tabla pedidos.outbox no exista (la hace Yuki), los eventos no se guardan.
+# Cuando exista, se pone OUTBOX_ACTIVO=1 en el compose.
+OUTBOX_ACTIVO = os.getenv("OUTBOX_ACTIVO", "0") == "1"
