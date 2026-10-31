@@ -1,6 +1,6 @@
 import secrets
 
-from app import db
+from app import config, db
 from app.errores import Conflicto, Invalido, NoEncontrado
 from app.modulos.pagos import servicio as pagos
 from app.modulos.pedidos import eventos, repositorio
@@ -140,3 +140,31 @@ def entregar_pedido(pedido_id, codigo):
 
         eventos.registrar(conn, "pedido.entregado", pedido, {})
         return _completo(conn, pedido), True
+
+
+def cancelar_vencidos():
+    """Cancela los pedidos vencidos. La llama la tarea de main.py cada pocos segundos.
+    Devuelve cuántos canceló."""
+    total = 0
+
+    # Pedidos que nunca se pagaron: se cancelan sin reembolso (nunca hubo cobro)
+    with db.conexion() as conn:
+        for p in repositorio.cancelar_vencidos(
+            conn, "PENDIENTE_PAGO", "sin_pago", config.TIMEOUT_PAGO_SEG
+        ):
+            eventos.registrar(conn, "pedido.cancelado", p,
+                              {"motivo": "sin_pago", "reembolsado": False})
+            total += 1
+
+    # Pedidos pagados que nadie tomó: la cancelación y el reembolso son UNA transacción.
+    # Si algo falla en medio, no queda un pedido cancelado con el pago sin devolver.
+    with db.conexion() as conn:
+        for p in repositorio.cancelar_vencidos(
+            conn, "PAGADO", "sin_repartidor", config.TIMEOUT_ASIGNACION_SEG
+        ):
+            pagos.reembolsar(conn, p["id"])
+            eventos.registrar(conn, "pedido.cancelado", p,
+                              {"motivo": "sin_repartidor", "reembolsado": True})
+            total += 1
+
+    return total

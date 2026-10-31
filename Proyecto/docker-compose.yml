@@ -1,5 +1,4 @@
-﻿version: '3.8'
-services:
+﻿services:
   app:
     build: .
     ports:
@@ -11,6 +10,7 @@ services:
       - DB_NAME=didistribuidores
       - TIMEOUT_PAGO_SEG=30
       - TIMEOUT_ASIGNACION_SEG=60
+      - REVISION_TIMEOUTS_SEG=5
     depends_on:
       - db
   db:

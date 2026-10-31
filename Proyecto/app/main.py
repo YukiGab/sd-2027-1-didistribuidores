@@ -1,22 +1,43 @@
-﻿from contextlib import asynccontextmanager
+﻿import asyncio
+import logging
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from app import db
+from app import config, db
 from app.errores import Conflicto, Invalido, NoEncontrado
 from app.modulos.pagos.router import router as pagos_router
+from app.modulos.pedidos import servicio as pedidos_servicio
 from app.modulos.pedidos.router import router as pedidos_router
 from app.modulos.repartidores.router import router as repartidores_router
 from app.modulos.restaurantes.router import router as restaurantes_router
 from app.modulos.usuarios.router import router as usuarios_router
 
+logger = logging.getLogger("uvicorn.error")
+
+
+async def _vigilar_timeouts():
+    """Tarea en segundo plano: cada pocos segundos cancela los pedidos vencidos."""
+    while True:
+        try:
+            cancelados = await asyncio.to_thread(pedidos_servicio.cancelar_vencidos)
+            if cancelados:
+                logger.info("Timeouts: %s pedido(s) cancelado(s)", cancelados)
+        except Exception:
+            logger.exception("Error al revisar los timeouts")
+        await asyncio.sleep(config.REVISION_TIMEOUTS_SEG)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.abrir_pool()   # al arrancar
+    tarea = asyncio.create_task(_vigilar_timeouts())
     yield
-    db.cerrar_pool()  # al apagar
+    tarea.cancel()    # al apagar
+    with suppress(asyncio.CancelledError):
+        await tarea
+    db.cerrar_pool()
 
 
 app = FastAPI(title="DiDistribuidores - Núcleo", lifespan=lifespan)

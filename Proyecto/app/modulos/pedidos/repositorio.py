@@ -113,3 +113,20 @@ def confirmar_entrega(conn, pedido_id, codigo):
         """,
         (pedido_id, codigo),
     ).fetchone()
+
+
+def cancelar_vencidos(conn, estado_actual, motivo, segundos):
+    """Cancela los pedidos que llevan más de 'segundos' en 'estado_actual' sin repartidor.
+    Devuelve la lista de pedidos cancelados. Como el UPDATE exige el estado actual, si la
+    tarea corre dos veces (o hay dos copias de la app) un pedido solo se cancela una vez."""
+    return conn.execute(
+        f"""
+        UPDATE pedidos.pedidos
+        SET estado = 'CANCELADO', motivo_cancelacion = %s,
+            version = version + 1, actualizado_en = now()
+        WHERE estado = %s AND repartidor_id IS NULL
+          AND actualizado_en < now() - (%s::double precision * interval '1 second')
+        RETURNING {COLUMNAS}
+        """,
+        (motivo, estado_actual, segundos),
+    ).fetchall()
