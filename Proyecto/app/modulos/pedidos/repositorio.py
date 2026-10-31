@@ -100,3 +100,16 @@ def asignar(conn, pedido_id, repartidor_id):
         """,
         (repartidor_id, pedido_id),
     ).fetchone()
+
+
+def confirmar_entrega(conn, pedido_id, codigo):
+    """Pasa a ENTREGADO solo si el pedido está ASIGNADO y el código coincide."""
+    return conn.execute(
+        f"""
+        UPDATE pedidos.pedidos
+        SET estado = 'ENTREGADO', version = version + 1, actualizado_en = now()
+        WHERE id = %s AND estado = 'ASIGNADO' AND codigo_entrega = %s
+        RETURNING {COLUMNAS}
+        """,
+        (pedido_id, codigo),
+    ).fetchone()

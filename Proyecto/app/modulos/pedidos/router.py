@@ -64,3 +64,13 @@ class Aceptacion(BaseModel):
 def aceptar_pedido(pedido_id: UUID, datos: Aceptacion):
     pedido, _ = servicio.aceptar_pedido(pedido_id, datos.repartidor_id)
     return pedido
+
+
+class Entrega(BaseModel):
+    codigo: str = Field(min_length=1)
+
+
+@router.post("/{pedido_id}/entrega")
+def entregar_pedido(pedido_id: UUID, datos: Entrega):
+    pedido, _ = servicio.entregar_pedido(pedido_id, datos.codigo.strip())
+    return pedido

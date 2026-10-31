@@ -124,3 +124,19 @@ def aceptar_pedido(pedido_id, repartidor_id):
 
         eventos.registrar(conn, "pedido.asignado", pedido, {"repartidorId": str(repartidor_id)})
         return _completo(conn, pedido), True
+
+
+def entregar_pedido(pedido_id, codigo):
+    """Confirma la entrega con el código. Devuelve (pedido, cambio)."""
+    with db.conexion() as conn:
+        pedido = repositorio.confirmar_entrega(conn, pedido_id, codigo)
+        if pedido is None:
+            actual = _estado_actual(conn, pedido_id)
+            if actual["estado"] == "ENTREGADO" and actual["codigo_entrega"] == codigo:
+                return _completo(conn, actual), False  # ya estaba entregado: mismo resultado
+            if actual["estado"] == "ASIGNADO":
+                raise Invalido("Código de entrega incorrecto")
+            raise Conflicto(f"No se puede entregar un pedido en estado {actual['estado']}")
+
+        eventos.registrar(conn, "pedido.entregado", pedido, {})
+        return _completo(conn, pedido), True
