@@ -74,3 +74,29 @@ def cambiar_estado(conn, pedido_id, desde, hacia):
         """,
         (hacia, pedido_id, desde),
     ).fetchone()
+
+
+def listar_pagados_por_zona(conn, zona):
+    return conn.execute(
+        f"""
+        SELECT {COLUMNAS} FROM pedidos.pedidos
+        WHERE estado = 'PAGADO' AND repartidor_id IS NULL AND zona = %s
+        ORDER BY actualizado_en
+        """,
+        (zona,),
+    ).fetchall()
+
+
+def asignar(conn, pedido_id, repartidor_id):
+    """Gana el primero que llegue: el UPDATE solo cambia la fila si sigue PAGADO y sin
+    repartidor. Al segundo le devuelve None."""
+    return conn.execute(
+        f"""
+        UPDATE pedidos.pedidos
+        SET estado = 'ASIGNADO', repartidor_id = %s,
+            version = version + 1, actualizado_en = now()
+        WHERE id = %s AND estado = 'PAGADO' AND repartidor_id IS NULL
+        RETURNING {COLUMNAS}
+        """,
+        (repartidor_id, pedido_id),
+    ).fetchone()

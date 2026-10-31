@@ -7,6 +7,7 @@ from app import db
 from app.errores import Conflicto, Invalido, NoEncontrado
 from app.modulos.pagos.router import router as pagos_router
 from app.modulos.pedidos.router import router as pedidos_router
+from app.modulos.repartidores.router import router as repartidores_router
 from app.modulos.restaurantes.router import router as restaurantes_router
 from app.modulos.usuarios.router import router as usuarios_router
 
@@ -38,6 +39,7 @@ app.include_router(usuarios_router)
 app.include_router(restaurantes_router)
 app.include_router(pedidos_router)
 app.include_router(pagos_router)
+app.include_router(repartidores_router)
 
 
 @app.get("/salud")

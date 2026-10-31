@@ -38,6 +38,13 @@ def crear_pedido(
     return pedido
 
 
+# Esta ruta va ANTES de "/{pedido_id}", si no FastAPI intentaría leer "disponibles" como un id
+@router.get("/disponibles")
+def pedidos_disponibles(repartidor_id: UUID):
+    """Pedidos PAGADO sin repartidor de la zona del repartidor."""
+    return servicio.listar_disponibles(repartidor_id)
+
+
 @router.get("/{pedido_id}")
 def obtener_pedido(pedido_id: UUID):
     return servicio.obtener_pedido(pedido_id)
@@ -46,4 +53,14 @@ def obtener_pedido(pedido_id: UUID):
 @router.post("/{pedido_id}/pago")
 def pagar_pedido(pedido_id: UUID):
     pedido, _ = servicio.pagar_pedido(pedido_id)
+    return pedido
+
+
+class Aceptacion(BaseModel):
+    repartidor_id: UUID
+
+
+@router.post("/{pedido_id}/aceptar")
+def aceptar_pedido(pedido_id: UUID, datos: Aceptacion):
+    pedido, _ = servicio.aceptar_pedido(pedido_id, datos.repartidor_id)
     return pedido

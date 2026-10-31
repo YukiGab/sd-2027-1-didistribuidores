@@ -4,6 +4,7 @@ from app import db
 from app.errores import Conflicto, Invalido, NoEncontrado
 from app.modulos.pagos import servicio as pagos
 from app.modulos.pedidos import eventos, repositorio
+from app.modulos.repartidores import servicio as repartidores
 from app.modulos.restaurantes import servicio as restaurantes
 from app.modulos.usuarios import servicio as usuarios
 
@@ -88,4 +89,38 @@ def pagar_pedido(pedido_id):
         # El cobro y el evento van en la MISMA transacción que el cambio de estado
         pagos.cobrar(conn, pedido_id, pedido["total"])
         eventos.registrar(conn, "pedido.pagado", pedido, {"total": float(pedido["total"])})
+        return _completo(conn, pedido), True
+
+
+def listar_disponibles(repartidor_id):
+    """Los pedidos PAGADO sin repartidor que están en la zona de ese repartidor."""
+    repartidor = repartidores.obtener_repartidor(repartidor_id)
+    if repartidor is None:
+        raise NoEncontrado("Repartidor no encontrado")
+    with db.conexion() as conn:
+        return repositorio.listar_pagados_por_zona(conn, repartidor["zona"])
+
+
+def aceptar_pedido(pedido_id, repartidor_id):
+    """Un repartidor acepta un pedido. Gana el primero. Devuelve (pedido, cambio)."""
+    repartidor = repartidores.obtener_repartidor(repartidor_id)
+    if repartidor is None:
+        raise NoEncontrado("Repartidor no encontrado")
+    if not repartidor["disponible"]:
+        raise Invalido("El repartidor no está disponible")
+
+    with db.conexion() as conn:
+        actual = _estado_actual(conn, pedido_id)
+    if actual["zona"] != repartidor["zona"]:
+        raise Invalido("El pedido es de otra zona")
+
+    with db.conexion() as conn:
+        pedido = repositorio.asignar(conn, pedido_id, repartidor_id)
+        if pedido is None:
+            actual = _estado_actual(conn, pedido_id)
+            if actual["estado"] == "ASIGNADO" and actual["repartidor_id"] == repartidor_id:
+                return _completo(conn, actual), False  # el mismo repartidor repite: mismo resultado
+            raise Conflicto("El pedido ya no está disponible")
+
+        eventos.registrar(conn, "pedido.asignado", pedido, {"repartidorId": str(repartidor_id)})
         return _completo(conn, pedido), True
