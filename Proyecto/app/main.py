@@ -1,50 +1,28 @@
-﻿from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import List
-import uuid
+﻿from contextlib import asynccontextmanager
 
-app = FastAPI(title="DiDistribuidores Monolito")
+from fastapi import FastAPI
 
-pedidos_db = {}
+from app import db
+from app.modulos.restaurantes.router import router as restaurantes_router
+from app.modulos.usuarios.router import router as usuarios_router
 
-class Pedido(BaseModel):
-    usuario_id: str
-    restaurante_id: str
-    items: List[str]
-    total: float
 
-@app.get("/")
-def read_root():
-    return {"mensaje": "Bienvenido al Monolito de DiDistribuidores"}
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db.abrir_pool()   # al arrancar
+    yield
+    db.cerrar_pool()  # al apagar
 
-@app.post("/pedidos")
-def crear_pedido(pedido: Pedido):
-    pedido_id = str(uuid.uuid4())
-    pedidos_db[pedido_id] = {"id": pedido_id, "estado": "PENDIENTE_PAGO", **pedido.dict()}
-    return {"mensaje": "Pedido creado", "pedido": pedidos_db[pedido_id]}
 
-@app.post("/pedidos/{pedido_id}/pagar")
-def procesar_pago(pedido_id: str):
-    if pedido_id not in pedidos_db:
-        raise HTTPException(status_code=404, detail="Pedido no encontrado")
-    pedido = pedidos_db[pedido_id]
-    if pedido["estado"] != "PENDIENTE_PAGO":
-        raise HTTPException(status_code=400, detail="El pedido ya fue pagado")
-    pedido["estado"] = "PAGADO"
-    return {"mensaje": "Pago exitoso", "pedido": pedido}
+app = FastAPI(title="DiDistribuidores - Núcleo", lifespan=lifespan)
 
-@app.post("/pedidos/{pedido_id}/asignar")
-def asignar_repartidor(pedido_id: str):
-    if pedido_id not in pedidos_db:
-        raise HTTPException(status_code=404, detail="Pedido no encontrado")
-    pedido = pedidos_db[pedido_id]
-    if pedido["estado"] != "PAGADO":
-        raise HTTPException(status_code=400, detail="El pedido no está pagado")
-    pedido["estado"] = "ASIGNADO"
-    return {"mensaje": "Repartidor asignado", "pedido": pedido}
+# main.py es el único archivo que conoce todos los módulos
+app.include_router(usuarios_router)
+app.include_router(restaurantes_router)
 
-@app.get("/pedidos/{pedido_id}")
-def consultar_pedido(pedido_id: str):
-    if pedido_id not in pedidos_db:
-        raise HTTPException(status_code=404, detail="Pedido no encontrado")
-    return pedidos_db[pedido_id]
+
+@app.get("/salud")
+def salud():
+    with db.conexion() as conn:
+        conn.execute("SELECT 1")
+    return {"estado": "ok"}
