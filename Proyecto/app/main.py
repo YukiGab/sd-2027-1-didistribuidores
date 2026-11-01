@@ -1,50 +1,70 @@
-﻿from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import List
-import uuid
+﻿import asyncio
+import logging
+from contextlib import asynccontextmanager, suppress
 
-app = FastAPI(title="DiDistribuidores Monolito")
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 
-pedidos_db = {}
+from app import config, db
+from app.errores import Conflicto, Invalido, NoEncontrado
+from app.modulos.pagos.router import router as pagos_router
+from app.modulos.pedidos import servicio as pedidos_servicio
+from app.modulos.pedidos.router import router as pedidos_router
+from app.modulos.repartidores.router import router as repartidores_router
+from app.modulos.restaurantes.router import router as restaurantes_router
+from app.modulos.usuarios.router import router as usuarios_router
 
-class Pedido(BaseModel):
-    usuario_id: str
-    restaurante_id: str
-    items: List[str]
-    total: float
+logger = logging.getLogger("uvicorn.error")
 
-@app.get("/")
-def read_root():
-    return {"mensaje": "Bienvenido al Monolito de DiDistribuidores"}
 
-@app.post("/pedidos")
-def crear_pedido(pedido: Pedido):
-    pedido_id = str(uuid.uuid4())
-    pedidos_db[pedido_id] = {"id": pedido_id, "estado": "PENDIENTE_PAGO", **pedido.dict()}
-    return {"mensaje": "Pedido creado", "pedido": pedidos_db[pedido_id]}
+async def _vigilar_timeouts():
+    """Tarea en segundo plano: cada pocos segundos cancela los pedidos vencidos."""
+    while True:
+        try:
+            cancelados = await asyncio.to_thread(pedidos_servicio.cancelar_vencidos)
+            if cancelados:
+                logger.info("Timeouts: %s pedido(s) cancelado(s)", cancelados)
+        except Exception:
+            logger.exception("Error al revisar los timeouts")
+        await asyncio.sleep(config.REVISION_TIMEOUTS_SEG)
 
-@app.post("/pedidos/{pedido_id}/pagar")
-def procesar_pago(pedido_id: str):
-    if pedido_id not in pedidos_db:
-        raise HTTPException(status_code=404, detail="Pedido no encontrado")
-    pedido = pedidos_db[pedido_id]
-    if pedido["estado"] != "PENDIENTE_PAGO":
-        raise HTTPException(status_code=400, detail="El pedido ya fue pagado")
-    pedido["estado"] = "PAGADO"
-    return {"mensaje": "Pago exitoso", "pedido": pedido}
 
-@app.post("/pedidos/{pedido_id}/asignar")
-def asignar_repartidor(pedido_id: str):
-    if pedido_id not in pedidos_db:
-        raise HTTPException(status_code=404, detail="Pedido no encontrado")
-    pedido = pedidos_db[pedido_id]
-    if pedido["estado"] != "PAGADO":
-        raise HTTPException(status_code=400, detail="El pedido no está pagado")
-    pedido["estado"] = "ASIGNADO"
-    return {"mensaje": "Repartidor asignado", "pedido": pedido}
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db.abrir_pool()   # al arrancar
+    tarea = asyncio.create_task(_vigilar_timeouts())
+    yield
+    tarea.cancel()    # al apagar
+    with suppress(asyncio.CancelledError):
+        await tarea
+    db.cerrar_pool()
 
-@app.get("/pedidos/{pedido_id}")
-def consultar_pedido(pedido_id: str):
-    if pedido_id not in pedidos_db:
-        raise HTTPException(status_code=404, detail="Pedido no encontrado")
-    return pedidos_db[pedido_id]
+
+app = FastAPI(title="DiDistribuidores - Núcleo", lifespan=lifespan)
+
+
+def _registrar_errores(app):
+    """Convierte los errores de negocio de los servicios en respuestas HTTP."""
+    for clase, codigo in ((NoEncontrado, 404), (Invalido, 422), (Conflicto, 409)):
+
+        async def manejador(request, exc, codigo=codigo):
+            return JSONResponse(status_code=codigo, content={"detail": exc.mensaje})
+
+        app.add_exception_handler(clase, manejador)
+
+
+_registrar_errores(app)
+
+# main.py es el único archivo que conoce todos los módulos
+app.include_router(usuarios_router)
+app.include_router(restaurantes_router)
+app.include_router(pedidos_router)
+app.include_router(pagos_router)
+app.include_router(repartidores_router)
+
+
+@app.get("/salud")
+def salud():
+    with db.conexion() as conn:
+        conn.execute("SELECT 1")
+    return {"estado": "ok"}
