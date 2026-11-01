@@ -1,4 +1,4 @@
-﻿services:
+services:
   app:
     build: .
     ports:
@@ -11,10 +11,13 @@
       - TIMEOUT_PAGO_SEG=30
       - TIMEOUT_ASIGNACION_SEG=60
       - REVISION_TIMEOUTS_SEG=5
+      - OUTBOX_ACTIVO=1
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+
   db:
-    image: postgres:15-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -22,4 +25,16 @@
     ports:
       - "5432:5432"
     volumes:
-      - ./db:/docker-entrypoint-initdb.d
+      - pgdata:/var/lib/postgresql/data
+      - ./db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # -h 127.0.0.1 es importante: durante la inicialización Postgres corre un servidor
+      # temporal que solo acepta conexiones por socket. Por TCP solo responde el definitivo,
+      # cuando ya terminaron los scripts de db/.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d didistribuidores"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pgdata:
