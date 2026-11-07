@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 import logging
 from contextlib import asynccontextmanager, suppress
 
@@ -9,6 +9,7 @@ from app import config, db
 from app.errores import Conflicto, Invalido, NoEncontrado
 from app.modulos.pagos.router import router as pagos_router
 from app.modulos.pedidos import servicio as pedidos_servicio
+from app.modulos.pedidos.publicador import Publicador
 from app.modulos.pedidos.router import router as pedidos_router
 from app.modulos.repartidores.router import router as repartidores_router
 from app.modulos.restaurantes.router import router as restaurantes_router
@@ -33,8 +34,14 @@ async def _vigilar_timeouts():
 async def lifespan(app: FastAPI):
     db.abrir_pool()   # al arrancar
     tarea = asyncio.create_task(_vigilar_timeouts())
+    publicador = None
+    if config.PUBLICADOR_ACTIVO:
+        publicador = Publicador()
+        publicador.start()
     yield
-    tarea.cancel()    # al apagar
+    if publicador is not None:   # al apagar
+        await asyncio.to_thread(publicador.detener)
+    tarea.cancel()
     with suppress(asyncio.CancelledError):
         await tarea
     db.cerrar_pool()
