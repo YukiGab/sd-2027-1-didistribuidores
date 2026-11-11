@@ -1,5 +1,5 @@
 -- Esquema del núcleo (etapa 01-monolito).
--- Un esquema de Postgres por módulo. Ninguna tabla apunta con llave foránea a una tabla
+-- Un esquema de Postgres por módulo del núcleo. Ninguna tabla apunta con llave foránea a una tabla
 -- de otro esquema: las referencias entre módulos son solo ids que se validan en el código.
 -- Así, cuando se separe un servicio, su esquema se mueve a otra base sin romper nada.
 
@@ -7,7 +7,6 @@ CREATE SCHEMA IF NOT EXISTS usuarios;
 CREATE SCHEMA IF NOT EXISTS restaurantes;
 CREATE SCHEMA IF NOT EXISTS pedidos;
 CREATE SCHEMA IF NOT EXISTS pagos;
-CREATE SCHEMA IF NOT EXISTS repartidores;
 
 -- Usuarios (sin contraseña: se identifican por id)
 CREATE TABLE usuarios.usuarios (
@@ -49,6 +48,7 @@ CREATE TABLE pedidos.pedidos (
     version             integer NOT NULL DEFAULT 1,
     creado_en           timestamptz NOT NULL DEFAULT now(),
     actualizado_en      timestamptz NOT NULL DEFAULT now(),
+    -- Lo que evita el pedido doble
     UNIQUE (usuario_id, clave_idempotencia)
 );
 
@@ -75,12 +75,6 @@ CREATE TABLE pagos.pagos (
     reembolsado_en   timestamptz
 );
 
--- Repartidores. Cuando se separe el servicio, este esquema se mueve a repartidores_db.
-CREATE TABLE repartidores.repartidores (
-    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    nombre      text NOT NULL,
-    zona        smallint NOT NULL CHECK (zona BETWEEN 1 AND 5),
-    disponible  boolean NOT NULL DEFAULT true
-);
-
--- Pendiente (lo agrega Yukio): pedidos.outbox y el esquema de notificaciones
+-- Los repartidores ya no viven aquí: desde la etapa 3 son un servicio con su propia base (db/06-repartidores.sql).
+-- pedidos.repartidor_id sigue siendo solo un uuid, sin llave foránea, porque la tabla está en otra base.
+-- La tabla pedidos.outbox está en db/03-outbox.sql y la base de notificaciones en db/04-notificaciones.sql.

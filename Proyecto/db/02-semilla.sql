@@ -22,9 +22,4 @@ FROM (VALUES
 ) AS p(restaurante, nombre, precio)
 JOIN restaurantes.restaurantes r ON r.nombre = p.restaurante;
 
-INSERT INTO repartidores.repartidores (nombre, zona) VALUES
-    ('Ana Ruiz',    1),
-    ('Luis Pérez',  1),
-    ('Marta Soto',  2),
-    ('Diego Vega',  2),
-    ('Sofía Mena',  3);
+-- Los repartidores de prueba ahora se cargan en db/06-repartidores.sql (base repartidores_db).

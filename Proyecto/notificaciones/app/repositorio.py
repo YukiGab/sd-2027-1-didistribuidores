@@ -32,7 +32,7 @@ def listar_por_usuario(conn, usuario_id):
 
 def listar_por_pedido(conn, pedido_id):
     return conn.execute(
-        f"SELECT {COLUMNAS} FROM avisos WHERE pedido_id = %s ORDER BY version_pedido",
+        f"SELECT {COLUMNAS} FROM avisos WHERE pedido_id = %s ORDER BY version_pedido, fecha_evento",
         (pedido_id,),
     ).fetchall()
 
@@ -43,7 +43,7 @@ def ultimo_de_pedido(conn, pedido_id):
         f"""
         SELECT {COLUMNAS} FROM avisos
         WHERE pedido_id = %s
-        ORDER BY version_pedido DESC
+        ORDER BY version_pedido DESC, fecha_evento DESC
         LIMIT 1
         """,
         (pedido_id,),

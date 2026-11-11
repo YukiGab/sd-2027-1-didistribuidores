@@ -1,10 +1,10 @@
 import secrets
 
 from app import config, db
+from app.clientes import repartidores
 from app.errores import Conflicto, Invalido, NoEncontrado
 from app.modulos.pagos import servicio as pagos
 from app.modulos.pedidos import eventos, repositorio
-from app.modulos.repartidores import servicio as repartidores
 from app.modulos.restaurantes import servicio as restaurantes
 from app.modulos.usuarios import servicio as usuarios
 
@@ -94,7 +94,7 @@ def pagar_pedido(pedido_id):
 
 def listar_disponibles(repartidor_id):
     """Los pedidos PAGADO sin repartidor que están en la zona de ese repartidor."""
-    repartidor = repartidores.obtener_repartidor(repartidor_id)
+    repartidor = repartidores.obtener(repartidor_id)
     if repartidor is None:
         raise NoEncontrado("Repartidor no encontrado")
     with db.conexion() as conn:
@@ -103,7 +103,7 @@ def listar_disponibles(repartidor_id):
 
 def aceptar_pedido(pedido_id, repartidor_id):
     """Un repartidor acepta un pedido. Gana el primero. Devuelve (pedido, cambio)."""
-    repartidor = repartidores.obtener_repartidor(repartidor_id)
+    repartidor = repartidores.obtener(repartidor_id)
     if repartidor is None:
         raise NoEncontrado("Repartidor no encontrado")
     if not repartidor["disponible"]:
@@ -167,4 +167,18 @@ def cancelar_vencidos():
                               {"motivo": "sin_repartidor", "reembolsado": True})
             total += 1
 
+    return total
+
+
+def avisar_retrasados():
+    """Avisa al cliente cuando su pedido pagado lleva demasiado tiempo sin repartidor.
+
+    Lo llama la tarea de main.py antes de cancelar_vencidos. Devuelve cuántos avisó.
+    El evento va al outbox en la misma transacción que la marca, así que no puede haber una
+    marca sin evento ni un evento sin marca."""
+    total = 0
+    with db.conexion() as conn:
+        for p in repositorio.marcar_retrasados(conn, config.UMBRAL_RETRASO_SEG):
+            eventos.registrar(conn, "pedido.retrasado", p, {"motivo": "buscando_repartidor"})
+            total += 1
     return total

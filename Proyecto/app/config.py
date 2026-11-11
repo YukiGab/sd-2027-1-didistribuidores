@@ -28,3 +28,13 @@ PUBLICADOR_ACTIVO = os.getenv("PUBLICADOR_ACTIVO", "0") == "1"
 PUBLICADOR_INTERVALO_SEG = float(os.getenv("PUBLICADOR_INTERVALO_SEG", "1"))  # espera si no hay pendientes
 PUBLICADOR_LOTE = int(os.getenv("PUBLICADOR_LOTE", "50"))                      # eventos por vuelta
 REINTENTO_SEG = float(os.getenv("REINTENTO_SEG", "3"))                         # espera tras un error
+
+# --- Etapa 3: el servicio de repartidores y el aviso de retraso ---
+# URL del servicio de repartidores. Dentro de Docker Compose se resuelve por el DNS interno.
+REPARTIDORES_URL = os.getenv("REPARTIDORES_URL", "http://localhost:8002")
+# Tiempo límite de cada llamada a repartidores (segundos). Sin esto, un servicio lento dejaría esperando al núcleo.
+REPARTIDORES_TIMEOUT_SEG = float(os.getenv("REPARTIDORES_TIMEOUT_SEG", "3"))
+REPARTIDORES_CONNECT_TIMEOUT_SEG = float(os.getenv("REPARTIDORES_CONNECT_TIMEOUT_SEG", "1"))
+# A partir de cuántos segundos pagado y sin repartidor se avisa al cliente que su pedido se retrasa.
+# Debe ser menor que TIMEOUT_ASIGNACION_SEG.
+UMBRAL_RETRASO_SEG = int(os.getenv("UMBRAL_RETRASO_SEG", "600"))
