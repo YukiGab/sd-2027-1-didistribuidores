@@ -1,6 +1,6 @@
 COLUMNAS = """id, usuario_id, restaurante_id, zona, estado, motivo_cancelacion, total,
               clave_idempotencia, repartidor_id, codigo_entrega, version,
-              creado_en, actualizado_en"""
+              creado_en, actualizado_en, retraso_avisado"""
 
 
 def insertar_si_no_existe(conn, usuario_id, restaurante_id, zona, total, clave, codigo):
@@ -129,4 +129,22 @@ def cancelar_vencidos(conn, estado_actual, motivo, segundos):
         RETURNING {COLUMNAS}
         """,
         (motivo, estado_actual, segundos),
+    ).fetchall()
+
+
+def marcar_retrasados(conn, segundos):
+    """Marca como avisados los pedidos pagados que llevan más de 'segundos' sin repartidor.
+
+    Solo marca los que todavía no se habían avisado, así el aviso sale UNA vez por pedido.
+    No toca version ni actualizado_en: no es un cambio de estado, y el reloj de cancelación
+    (que cuenta desde que se pagó) sigue corriendo."""
+    return conn.execute(
+        f"""
+        UPDATE pedidos.pedidos
+        SET retraso_avisado = true
+        WHERE estado = 'PAGADO' AND repartidor_id IS NULL AND NOT retraso_avisado
+          AND actualizado_en < now() - (%s::double precision * interval '1 second')
+        RETURNING {COLUMNAS}
+        """,
+        (segundos,),
     ).fetchall()
