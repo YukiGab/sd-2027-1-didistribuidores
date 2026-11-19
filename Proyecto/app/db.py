@@ -16,6 +16,10 @@ def abrir_pool():
         min_size=1,
         max_size=10,
         kwargs={"row_factory": dict_row},  # las filas llegan como diccionarios
+        # Etapa 4: antes de entregar una conexión se comprueba que sigue viva. Si PostgreSQL se
+        # reinició, las conexiones guardadas están rotas: el pool las descarta y abre nuevas,
+        # y el servicio se recupera solo, sin reiniciarse.
+        check=ConnectionPool.check_connection,
         open=False,
     )
     _pool.open(wait=True, timeout=30)

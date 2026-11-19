@@ -1,14 +1,17 @@
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app import config, db
+from app.clientes import repartidores
 from app.errores import Conflicto, Invalido, NoEncontrado, ServicioNoDisponible
 from app.modulos.pagos.router import router as pagos_router
-from app.modulos.pedidos import servicio as pedidos_servicio
+from app.modulos.pedidos import eventos, servicio as pedidos_servicio
 from app.modulos.pedidos.publicador import Publicador
 from app.modulos.pedidos.router import router as pedidos_router
 from app.modulos.restaurantes.router import router as restaurantes_router
@@ -76,3 +79,16 @@ def salud():
     with db.conexion() as conn:
         conn.execute("SELECT 1")
     return {"estado": "ok"}
+
+
+@app.get("/estado")
+def estado():
+    """Lo que importa para operar el sistema: el circuito hacia repartidores y los eventos
+    que aún no se publican a RabbitMQ (si suben y no bajan, algo pasa con el broker o el publicador)."""
+    with db.conexion() as conn:
+        pendientes = eventos.contar_pendientes(conn)
+    return {"repartidores": repartidores.estado_circuito(), "outbox_pendientes": pendientes}
+
+
+# Panel de demostración (HTML). Se sirve desde el mismo origen que la API, por el gateway: /panel/
+app.mount("/panel", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "panel"), html=True), name="panel")

@@ -1,0 +1,19 @@
+$ docker compose restart db 2>&1 | tail -1
+ Container proyecto-db-1 Started 
+$ curl -s $B/salud; echo
+{"estado":"ok"}
+$ echo "pedido $ID: $(estado_pedido $ID)"
+pedido 684cd2ae-ed5f-40f0-9dab-4339d67481ee: PAGADO
+$ avisos $ID
+2 pedido.pagado | Recibimos tu pago de $25.00. Estamos buscando un repartidor.
+$ curl -s "$B/api/repartidores?zona=3" | head -c 120; echo
+[{"id":"8709d095-b6d5-4785-ac2b-260c924d5ead","nombre":"Sofía Mena","zona":3,"disponible":true,"creado_en":"2026-11-19T
+$ docker compose ps --format "table {{.Service}}\t{{.Status}}"
+SERVICE          STATUS
+app              Up 52 seconds
+db               Up 25 seconds (healthy)
+notificaciones   Up 8 minutes
+rabbitmq         Up About a minute (healthy)
+repartidores     Up About a minute
+repartidores     Up About a minute
+traefik          Up 8 minutes

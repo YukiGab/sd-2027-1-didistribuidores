@@ -1,0 +1,13 @@
+$ docker compose ps --format "table {{.Service}}\t{{.Status}}"
+SERVICE          STATUS
+app              Up 38 seconds
+db               Up 46 seconds (healthy)
+notificaciones   Up 38 seconds
+rabbitmq         Up 46 seconds (healthy)
+repartidores     Up 38 seconds
+repartidores     Up 39 seconds
+traefik          Up 46 seconds
+$ curl -s $B/salud; echo
+{"estado":"ok"}
+$ curl -s $B/estado; echo
+{"repartidores":{"circuito":"CERRADO","fallos_seguidos":0,"abierto_desde_hace_seg":null},"outbox_pendientes":0}

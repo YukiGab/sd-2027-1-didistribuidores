@@ -15,7 +15,11 @@ def abrir_pool():
         conninfo=config.DB_CONNINFO,
         min_size=1,
         max_size=10,
-        kwargs={"row_factory": dict_row},
+        kwargs={"row_factory": dict_row},  # las filas llegan como diccionarios
+        # Etapa 4: antes de entregar una conexión se comprueba que sigue viva. Si PostgreSQL se
+        # reinició, las conexiones guardadas están rotas: el pool las descarta y abre nuevas,
+        # y el servicio se recupera solo, sin reiniciarse.
+        check=ConnectionPool.check_connection,
         open=False,
     )
     _pool.open(wait=True, timeout=30)
@@ -28,6 +32,10 @@ def cerrar_pool():
 
 @contextmanager
 def conexion():
-    """Una conexión dentro de una transacción: commit si todo sale bien, rollback si hay error."""
+    """Da una conexión del pool dentro de una transacción.
+
+    Si el bloque termina bien, hace commit. Si lanza una excepción, hace rollback.
+    Todo lo que se haga dentro de un mismo 'with' es una sola transacción.
+    """
     with _pool.connection() as conn:
         yield conn

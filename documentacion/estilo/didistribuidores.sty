@@ -1,0 +1,170 @@
+% Estilo común de la documentación de DiDistribuidores.
+% Lo usan las bitácoras, el documento de pruebas, el manual de usuario y el reporte final.
+% Uso: \usepackage{../estilo/didistribuidores}
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{didistribuidores}[2026/11/18 Estilo DiDistribuidores]
+
+\RequirePackage[utf8]{inputenc}
+\RequirePackage[T1]{fontenc}
+\RequirePackage[spanish,es-noshorthands,es-tabla]{babel}
+\RequirePackage{lmodern}
+\RequirePackage[scaled=0.92]{helvet}
+\RequirePackage{microtype}
+\RequirePackage[letterpaper,top=2.4cm,bottom=2.4cm,left=2.5cm,right=2.5cm,headheight=14pt]{geometry}
+\RequirePackage{graphicx}
+\RequirePackage[table]{xcolor}
+\RequirePackage{listings}
+\RequirePackage{booktabs,tabularx,longtable,array}
+\RequirePackage{fancyhdr}
+\RequirePackage{titlesec}
+\RequirePackage{enumitem}
+\RequirePackage{caption}
+\RequirePackage{float}
+\RequirePackage[most]{tcolorbox}
+\RequirePackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,shapes.geometric,fit,calc,backgrounds}
+\RequirePackage{needspace}
+\RequirePackage{tocloft}
+\setlength{\cftsecnumwidth}{2.2em}
+\setlength{\cftsubsecnumwidth}{2.8em}
+\RequirePackage[hidelinks]{hyperref}
+
+% ------------------------------------------------------------------ colores
+\definecolor{azulsd}{HTML}{1F3A68}
+\definecolor{acento}{HTML}{3D5AFE}
+\definecolor{grisfondo}{HTML}{F4F5F7}
+\definecolor{grislinea}{HTML}{C9CDD3}
+\definecolor{grisTexto}{HTML}{5A5F66}
+\definecolor{consola}{HTML}{1E1F24}
+\definecolor{verdeok}{HTML}{1B7F3B}
+\definecolor{ambar}{HTML}{B25E00}
+\definecolor{rojo}{HTML}{C62828}
+
+\hypersetup{colorlinks=true,linkcolor=azulsd,urlcolor=acento,citecolor=azulsd}
+
+% ------------------------------------------------------------------ títulos
+\titleformat{\section}{\needspace{10\baselineskip}\sffamily\Large\bfseries\color{azulsd}}{\thesection}{0.8em}{}[\vspace{2pt}{\color{grislinea}\titlerule}]
+\titleformat{\subsection}{\needspace{7\baselineskip}\sffamily\large\bfseries\color{azulsd}}{\thesubsection}{0.7em}{}
+\titleformat{\subsubsection}{\sffamily\normalsize\bfseries}{\thesubsubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{16pt}{8pt}
+\titlespacing*{\subsection}{0pt}{12pt}{5pt}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\setlist{itemsep=2pt,topsep=4pt}
+\captionsetup{font={small,sf},labelfont={bf,color=azulsd},justification=centering}
+\renewcommand{\arraystretch}{1.25}
+
+% ------------------------------------------------------------------ encabezado y pie
+\newcommand{\documentocorto}{DiDistribuidores}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\sffamily\small\color{grisTexto}DiDistribuidores}
+\fancyhead[R]{\sffamily\small\color{grisTexto}\documentocorto}
+\fancyfoot[L]{\sffamily\footnotesize\color{grisTexto}Sistemas Distribuidos 2027-1 · Grupo 2 · FI-UNAM}
+\fancyfoot[R]{\sffamily\small\color{grisTexto}\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{grislinea}\leaders\hrule height \headrulewidth\hfill}}
+
+% ------------------------------------------------------------------ código y consola
+% listings no entiende UTF-8 por sí solo: se le enseñan los acentos.
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  breakatwhitespace=false,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  upquote=true,
+  literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1 {ñ}{{\~n}}1
+           {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1 {Ñ}{{\~N}}1
+           {ü}{{\"u}}1 {¿}{{?`}}1 {¡}{{!`}}1 {→}{{$\rightarrow$}}1 {─}{{-}}1 {│}{{|}}1
+           {└}{{+}}1 {┌}{{+}}1 {┐}{{+}}1 {┘}{{+}}1 {├}{{+}}1 {┤}{{+}}1 {┬}{{+}}1 {┴}{{+}}1 {┼}{{+}}1
+           {▼}{{v}}1 {►}{{>}}1 {▲}{{\^{}}}1 {·}{{$\cdot$}}1 {✓}{{v}}1 {…}{{...}}1 {—}{{-}}1 {¡}{{!`}}1,
+}
+\lstdefinestyle{comando}{
+  backgroundcolor=\color{consola},
+  basicstyle=\ttfamily\small\color{white},
+  frame=none, xleftmargin=6pt, xrightmargin=6pt, aboveskip=4pt, belowskip=4pt,
+}
+\lstdefinestyle{salida}{
+  backgroundcolor=\color{grisfondo},
+  basicstyle=\ttfamily\footnotesize\color{black},
+  frame=none, xleftmargin=6pt, xrightmargin=6pt, aboveskip=4pt, belowskip=4pt,
+}
+\lstdefinestyle{codigo}{
+  backgroundcolor=\color{grisfondo},
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{azulsd}\bfseries,
+  commentstyle=\color{grisTexto}\itshape,
+  stringstyle=\color{verdeok},
+  numbers=left, numberstyle=\tiny\color{grisTexto}, numbersep=6pt, xleftmargin=14pt,
+}
+% Bloques: comando ejecutado y salida observada
+\lstnewenvironment{comando}{\lstset{style=comando}}{}
+\lstnewenvironment{salida}{\lstset{style=salida}}{}
+
+% \cod: código en línea (el guion doble no se junta en uno: ver \DisableLigatures abajo).
+\newcommand{\cod}[1]{\texttt{\small #1}}
+\DisableLigatures[-]{encoding=T1,family=tt*}
+% Columnas de tabla con texto alineado a la izquierda (Y se estira; P tiene ancho fijo)
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+% ------------------------------------------------------------------ cajas
+\newtcolorbox{nota}[1][Nota]{enhanced,breakable,colback=grisfondo,colframe=azulsd,boxrule=0pt,
+  leftrule=3pt,arc=0pt,fonttitle=\sffamily\bfseries\small,coltitle=azulsd,colbacktitle=grisfondo,
+  title={#1},attach title to upper={\ \ },left=8pt,right=8pt,top=4pt,bottom=4pt}
+\newtcolorbox{resultado}{enhanced,breakable,colback=white,colframe=verdeok,boxrule=0.6pt,arc=2pt,
+  left=8pt,right=8pt,top=4pt,bottom=4pt,fontupper=\small}
+
+% Las tres partes de cada prueba
+\newcommand{\queria}{\textsf{\textbf{\color{azulsd}Qué queríamos comprobar.}}\ }
+\newcommand{\comofunciona}{\textsf{\textbf{\color{azulsd}Cómo funciona.}}\ }
+\newcommand{\esperado}{\textsf{\textbf{\color{azulsd}Resultado esperado.}}\ }
+\newcommand{\observado}{\textsf{\textbf{\color{verdeok}Qué se observó.}}\ }
+\newcommand{\conclusion}{\textsf{\textbf{\color{azulsd}Conclusión.}}\ }
+
+% Una captura con su pie
+\newcommand{\figura}[3][0.92]{%
+  \begin{figure}[H]\centering
+    \fbox{\includegraphics[width=#1\linewidth,keepaspectratio,height=0.42\textheight]{#2}}
+    \caption{#3}
+  \end{figure}}
+
+% Marca de estado en tablas de resumen
+\newcommand{\ok}{\textcolor{verdeok}{\textsf{\textbf{Cumple}}}}
+\newcommand{\parcial}{\textcolor{ambar}{\textsf{\textbf{Parcial}}}}
+
+% ------------------------------------------------------------------ portada
+% \portada{Tipo de documento}{Título}{Subtítulo}{Rama o alcance}{Fecha}
+\newcommand{\portada}[5]{%
+  \begin{titlepage}
+    \thispagestyle{empty}
+    \begin{tikzpicture}[remember picture,overlay]
+      \fill[azulsd] (current page.north west) rectangle ([yshift=-7.2cm]current page.north east);
+      \node[anchor=north west,text=white,font=\sffamily\small] at ([xshift=2.5cm,yshift=-1.6cm]current page.north west)
+        {UNIVERSIDAD NACIONAL AUTÓNOMA DE MÉXICO · FACULTAD DE INGENIERÍA};
+      \node[anchor=north west,text=white,font=\sffamily\Huge\bfseries] at ([xshift=2.5cm,yshift=-3.1cm]current page.north west)
+        {DiDistribuidores};
+      \node[anchor=north west,text=white!85!azulsd,font=\sffamily\large] at ([xshift=2.5cm,yshift=-4.6cm]current page.north west)
+        {Sistema de pedidos y entrega de comida a domicilio};
+    \end{tikzpicture}
+    \vspace*{7.2cm}
+    {\sffamily\large\color{acento}\MakeUppercase{#1}\par}
+    \vspace{0.3cm}
+    {\sffamily\fontsize{26}{32}\selectfont\bfseries\color{azulsd}#2\par}
+    \vspace{0.4cm}
+    {\large\color{grisTexto}#3\par}
+    \vfill
+    {\color{grislinea}\rule{\linewidth}{0.6pt}}\par\vspace{0.2cm}
+    \begin{tabularx}{\linewidth}{@{}l X@{}}
+      \textsf{\textbf{Materia}} & Sistemas Distribuidos 2027-1, Grupo 2 \\
+      \textsf{\textbf{Profesor}} & Oscar Ruiz \\
+      \textsf{\textbf{Equipo}} & Erick Isaac Echeverria Goicochea (@ErickI07) \\
+                               & Yukioayax Canek Gabriel Hernández (@YukiGab) \\
+      \textsf{\textbf{Repositorio}} & \url{https://github.com/YukiGab/sd-2027-1-didistribuidores} \\
+      \textsf{\textbf{Alcance}} & #4 \\
+      \textsf{\textbf{Fecha}} & #5 \\
+    \end{tabularx}
+  \end{titlepage}}

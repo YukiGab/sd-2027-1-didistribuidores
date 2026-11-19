@@ -1,0 +1,264 @@
+\documentclass[11pt]{article}
+\makeatletter\def\input@path{{../estilo/}}\makeatother
+\usepackage{didistribuidores}
+\renewcommand{\documentocorto}{Pruebas del proyecto}
+
+\begin{document}
+\portada{Plan y resultados de pruebas}{Pruebas del proyecto}%
+  {Cómo probar cada etapa, qué se espera y qué se obtuvo, de la etapa 1 a la 4}%
+  {Ramas \cod{01-monolito} a \cod{04-resiliencia}}{18 de noviembre de 2026}
+
+\tableofcontents
+\newpage
+
+\section{Para qué sirve este documento}
+
+Reúne en un solo lugar \textbf{todas las pruebas del sistema}: cómo prepararlas, el comando exacto, el
+resultado esperado y el resultado obtenido. Las bitácoras de cada etapa
+(\cod{documentacion/bitacora-1} a \cod{bitacora-4}) traen la explicación detallada y las capturas; aquí
+está la versión de consulta rápida, pensada para repetir las pruebas antes de la presentación o
+durante la defensa.
+
+\begin{nota}[Qué cambió respecto al documento ``Pruebas proyecto 01-monolito'']
+El documento anterior cubría las fases 1 y 2 con notas sueltas y capturas. Esta versión cubre las cuatro
+etapas, usa siempre el gateway (\cod{http://localhost:8080}), corrige los identificadores partidos y
+los comandos con variables vacías del original, separa el resultado esperado del obtenido y agrega la
+regresión que se corrió el 18 de noviembre de 2026 sobre el código final.
+\end{nota}
+
+\subsection{Estado general}
+\begin{tabularx}{\linewidth}{@{}l X l l@{}}
+\toprule
+\textsf{\textbf{Etapa}} & \textsf{\textbf{Qué se prueba}} & \textsf{\textbf{Pruebas}} & \textsf{\textbf{Estado}} \\
+\midrule
+1 & Monolito: idempotencia, pago, aceptación, entrega, relojes, outbox & 14 & \ok \\
+2 & Notificaciones aparte: RabbitMQ, cola durable, DLQ, consumidor idempotente & 7 & \ok \\
+3 & Repartidores aparte: gateway, dos copias, tiempo límite, aviso de retraso & 10 & \ok \\
+4 & Resiliencia: circuit breaker, reintentos, huella, recuperación & 8 & \ok \\
+Final & Regresión de las etapas 1 a 3 sobre el código final & 9 & \ok \\
+\bottomrule
+\end{tabularx}
+
+\section{Preparación}
+
+\subsection{Requisitos}
+Docker Desktop (o Docker Engine con Compose v2) y una terminal \textbf{bash} (Linux, macOS, WSL o Git Bash
+en Windows). Las funciones usan \cod{curl} y \cod{python3} (o \cod{python}) para leer JSON.
+
+\subsection{Levantar el sistema desde cero}
+\begin{comando}
+cd Proyecto
+docker compose down -v          # borra los datos: los scripts de db/ solo corren con el volumen vacío
+docker compose up --build -d
+docker compose ps               # siete contenedores; db y rabbitmq en (healthy)
+curl -s http://localhost:8080/estado
+\end{comando}
+
+\subsection{Variables y funciones auxiliares}
+Todas las pruebas usan las mismas variables. Se cargan con
+\cod{source ../documentacion/bitacora-4/pruebas/comun.sh} desde \cod{Proyecto/}:
+
+\lstinputlisting[style=salida]{../bitacora-4/pruebas/comun.sh}
+
+\begin{tabularx}{\linewidth}{@{}l X@{}}
+\toprule
+\textsf{\textbf{Nombre}} & \textsf{\textbf{Qué es}} \\
+\midrule
+\cod{B} & La dirección del gateway: la única entrada al sistema. \\
+\cod{U}, \cod{R}, \cod{P}, \cod{REP} & Usuario de prueba (zona 3), primer restaurante, su primer platillo y la repartidora de la zona 3. \\
+\cod{nuevo\_pedido} & Crea un pedido con una clave de idempotencia nueva y devuelve su id. \\
+\cod{pagar}, \cod{estado\_pedido} & Paga un pedido; muestra su estado. \\
+\cod{aceptar\_tiempo} & Hace que un repartidor acepte un pedido y muestra el código HTTP y cuánto tardó. \\
+\cod{avisos} & Los avisos que recibió el cliente por ese pedido (versión, tipo y mensaje). \\
+\cod{paso} & Imprime el comando y lo ejecuta (así la evidencia guarda lo que se corrió). \\
+\bottomrule
+\end{tabularx}
+
+\begin{nota}[En PowerShell]
+Las mismas pruebas se pueden hacer con \cod{curl.exe} e \cod{Invoke-RestMethod}; la bitácora 2 trae
+los equivalentes (\cod{Ciclo-Completo}, \cod{Avisos}, \cod{Cola}, \cod{Psql}). La forma más sencilla en
+Windows es usar Git Bash, que trae \cod{bash} y \cod{curl}.
+\end{nota}
+
+\section{Etapa 1: monolito modular}
+
+Las pruebas originales se hicieron contra \cod{localhost:8000}, antes de que existiera el gateway; con
+el código final se usa \cod{\$B}. Evidencia con capturas: bitácora 1.
+
+{\small\begin{tabularx}{\linewidth}{@{}l P{3.5cm} Y P{3.4cm} l@{}}
+\toprule
+\textsf{\textbf{ID}} & \textsf{\textbf{Qué se prueba}} & \textsf{\textbf{Cómo}} & \textsf{\textbf{Esperado}} & \textsf{\textbf{Obtenido}} \\
+\midrule
+1.1 & La app responde y está conectada a la base & \cod{curl \$B/salud} & \cod{\{"estado":"ok"\}} & \ok \\
+1.2 & Usuarios, restaurantes y menú & \cod{POST /api/usuarios}; \cod{GET /api/restaurantes} y su menú & 201 y listas; id mal formado da 422 & \ok \\
+1.3 & Reintento con la misma clave & El mismo \cod{POST /api/pedidos} dos veces & 201 y luego 200 con el mismo id & \ok \\
+1.4 & Cinco pedidos simultáneos con la misma clave & 5 \cod{curl} en paralelo y \cod{count(*)} & Un 201, cuatro 200, \cod{count = 1} & \ok \\
+1.5 & Sin \cod{Idempotency-Key} & \cod{POST} sin el encabezado & 400 & \ok \\
+1.6 & Platillo o usuario inexistente & \cod{POST} con ids inventados & 422 / 404 & \ok \\
+1.7 & Pago repetido & Pagar dos veces y \cod{GET /api/pagos/\{id\}} & 200, 200, un cobro, versión 2 & \ok \\
+1.8 & Cinco pagos simultáneos & 5 pagos en paralelo & Cinco 200; \cod{cobros = 1}, \cod{version = 2} & \ok \\
+1.9 & Pedidos disponibles por zona & \cod{GET .../disponibles} con el \cod{repartidor\_id} & Solo pedidos pagados de su zona & \ok \\
+1.10 & Dos repartidores aceptan a la vez & 2 aceptaciones en paralelo & Un 200, un 409; versión 3 & \ok \\
+1.11 & Otra zona / sin pagar & Aceptar con repartidor de otra zona; pedido sin pagar & 422 / 409 & \ok \\
+1.12 & Entrega con código & Incorrecto, correcto, repetido; 5 en paralelo & 422, 200, 200; \cod{ENTREGADO} versión 4 & \ok \\
+1.13 & Relojes de cancelación & Esperar 40 s sin pagar; 70 s pagado sin repartidor & \cod{sin\_pago}; \cod{sin\_repartidor} y \cod{REEMBOLSADO} & \ok \\
+1.14 & Infraestructura y outbox & \cod{down -v}, \cod{up}, conteos y \cod{\textbackslash d pedidos.outbox} & 3 restaurantes, 9 platillos, 5 repartidores; 3 eventos por pedido & \ok \\
+\bottomrule
+\end{tabularx}}
+
+\subsection*{Comandos clave}
+\begin{comando}
+# 1.4  Cinco peticiones simultáneas con la misma clave
+K="clave-$(date +%s)"; C="{\"usuario_id\":\"$U\",\"restaurante_id\":\"$R\",\"platillos\":[{\"platillo_id\":\"$P\",\"cantidad\":2}]}"
+for i in 1 2 3 4 5; do curl -s -o /dev/null -w "%{http_code} " -X POST $B/api/pedidos \
+  -H "Content-Type: application/json" -H "Idempotency-Key: $K" -d "$C" & done; wait; echo
+docker compose exec -T db psql -U postgres -d didistribuidores \
+  -c "SELECT count(*) FROM pedidos.pedidos WHERE clave_idempotencia='$K'"
+
+# 1.8  Cinco pagos simultáneos
+ID=$(nuevo_pedido)
+for i in 1 2 3 4 5; do curl -s -o /dev/null -w "%{http_code} " -X POST $B/api/pedidos/$ID/pago & done; wait
+
+# 1.12 Entrega: leer el código y confirmarlo
+COD=$(curl -s $B/api/pedidos/$ID | python3 -c "$J['codigo_entrega'])")
+curl -s -X POST $B/api/pedidos/$ID/entrega -H "Content-Type: application/json" -d "{\"codigo\":\"$COD\"}"
+\end{comando}
+
+\section{Etapa 2: notificaciones como servicio aparte}
+
+Evidencia con capturas: bitácora 2. \cod{herramientas/publicar\_prueba.py} publica eventos de prueba
+directamente en RabbitMQ (válidos, duplicados, inválidos o desordenados).
+
+{\small\begin{tabularx}{\linewidth}{@{}l P{3.5cm} Y P{3.4cm} l@{}}
+\toprule
+\textsf{\textbf{ID}} & \textsf{\textbf{Qué se prueba}} & \textsf{\textbf{Cómo}} & \textsf{\textbf{Esperado}} & \textsf{\textbf{Obtenido}} \\
+\midrule
+2.0 & Arranque y colas & \cod{/estado}; consola \url{http://localhost:15672} & Colas \cod{notificaciones.pedidos} y \cod{.dlq} durables & \ok \\
+2.1 & Flujo normal & Pedido completo; \cod{avisos \$ID} & Avisos v2, v3, v4; outbox publicado & \ok \\
+2.2 & Notificaciones apagado (5.2 CA1--CA2) & \cod{docker compose stop notificaciones}, pedido completo, \cod{start} & Pedido \cod{ENTREGADO}; 3 mensajes esperan; al volver, 3 avisos una vez & \ok \\
+2.3 & Evento duplicado & \cod{publicar\_prueba.py --evento-id X --veces 3} & Un aviso; 2 ``Evento repetido'' & \ok \\
+2.4 & Mensaje inválido (5.2 CA3) & \cod{publicar\_prueba.py --invalido} & 1 mensaje en la DLQ; el siguiente evento se guarda & \ok \\
+2.5 & Eventos desordenados & Versión 4 antes que la 3 & Ordenados por versión; \cod{/ultimo} da la 4 & \ok \\
+2.6 & RabbitMQ caído & \cod{stop rabbitmq}, pedido, \cod{start} & Pedido avanza; pendientes en outbox; luego 0 & \ok \\
+2.7 & Reinicio de RabbitMQ & \cod{restart rabbitmq} con mensajes en cola & Los mensajes sobreviven & \ok \\
+\bottomrule
+\end{tabularx}}
+
+\subsection*{Comandos clave}
+\begin{comando}
+cola() { docker compose exec -T rabbitmq rabbitmqctl list_queues name messages consumers; }
+
+# 2.2  Notificaciones apagado
+docker compose stop notificaciones
+ID=$(nuevo_pedido); pagar $ID      # (y aceptar y entregar, como en 1.12)
+sleep 3; cola                      # notificaciones.pedidos  3  0
+docker compose start notificaciones; sleep 6; avisos $ID; cola
+
+# 2.3 y 2.4  Duplicado e inválido
+PD=$(python3 -c "import uuid; print(uuid.uuid4())"); EV=$(python3 -c "import uuid; print(uuid.uuid4())")
+docker compose exec -T notificaciones python herramientas/publicar_prueba.py --pedido-id $PD --evento-id $EV --veces 3
+docker compose exec -T notificaciones python herramientas/publicar_prueba.py --invalido
+\end{comando}
+
+\section{Etapa 3: repartidores como servicio y gateway}
+
+Evidencia con capturas: bitácora 3.
+
+{\small\begin{tabularx}{\linewidth}{@{}l P{3.5cm} Y P{3.4cm} l@{}}
+\toprule
+\textsf{\textbf{ID}} & \textsf{\textbf{Qué se prueba}} & \textsf{\textbf{Cómo}} & \textsf{\textbf{Esperado}} & \textsf{\textbf{Obtenido}} \\
+\midrule
+3.0 & Despliegue & \cod{docker compose ps}; panel de Traefik (:8081) & 7 contenedores; 3 routers; 2 servidores de repartidores & \ok \\
+3.1 & Enrutamiento & Una petición a cada servicio por \cod{\$B} & Contestan núcleo, repartidores y notificaciones & \ok \\
+3.2 & Balanceo & 10 consultas contando \cod{X-Instancia} & 5 y 5 & \ok \\
+3.3 & Pedido completo por el gateway & Crear, pagar, aceptar, entregar & Avisos 2, 3, 4; la llamada interna no pasa por Traefik & \ok \\
+3.4 & Aceptación simultánea & Dos repartidores a la vez & 200 y 409 & \ok \\
+3.5 & Cae una copia & \cod{docker stop} de una copia & Diez 200; al volver, 5 y 5 & \ok \\
+3.6 & Caen las dos copias & \cod{docker compose stop repartidores} & Pedido \cod{PAGADO}; aceptar da 503; aviso de retraso; cancelación con reembolso & \ok \\
+3.7 & Repartidores lento & \cod{LATENCIA\_MS=5000 docker compose up -d repartidores} & 503 a los 3 s & \ok \\
+3.8 & Una base por servicio & \cod{psql -c "\textbackslash l"} & \cod{didistribuidores}, \cod{notificaciones\_db}, \cod{repartidores\_db} & \ok \\
+3.9 & Disponibilidad & \cod{PATCH} con \cod{disponible:false} y aceptar & 422 ``no está disponible'' & \ok \\
+3.10 & Única entrada & \cod{docker compose ps --format ...Ports} & Solo Traefik expone la aplicación & \ok \\
+\bottomrule
+\end{tabularx}}
+
+\section{Etapa 4: resiliencia}
+
+Cada prueba es un script en \cod{documentacion/bitacora-4/pruebas/} (\cod{prueba-0.sh} a
+\cod{prueba-7.sh}); se corre con \cod{source} después de \cod{comun.sh}. Salidas completas y análisis:
+bitácora 4.
+
+{\small\begin{tabularx}{\linewidth}{@{}l P{3.2cm} Y P{3.6cm} P{2.1cm}@{}}
+\toprule
+\textsf{\textbf{ID}} & \textsf{\textbf{Qué se prueba}} & \textsf{\textbf{Esperado}} & \textsf{\textbf{Obtenido (18/11/2026)}} & \textsf{\textbf{Estado}} \\
+\midrule
+4.0 & Arranque y \cod{/estado} & \cod{CERRADO}, 0 pendientes & Igual & \ok \\
+4.1 & Clave reutilizada con otro pedido & 201, 200, 422 & 201, 200, 422; un solo pedido & \ok \\
+4.2 & Repartidores lento y breaker & 3 intentos de 3 s, luego instantáneos; se recupera & 3.02 s ×3, luego 7 ms; \cod{ABIERTO} $\rightarrow$ \cod{CERRADO} & \ok \\
+4.3 & Una copia congelada & Mezcla de 200 y 503 de 3 s & Igual; además el circuito se abrió (3 fallos seguidos) & \ok{} (hallazgo) \\
+4.4 & Repartidores caído & 503 rápido y circuito abierto & Antes: 8 s; tras el arreglo: 1 s y luego 7 ms & \ok{} (corregido) \\
+4.5 & El núcleo muere tras un pago & El evento sale al volver, una vez & 1 pendiente $\rightarrow$ 0; un aviso de pago & \ok \\
+4.6 & PostgreSQL se reinicia & Todo se recupera sin reiniciar servicios & Igual & \ok \\
+4.7 & El gateway se cae & 000 afuera; adentro sí hay comunicación & Igual & \ok \\
+\bottomrule
+\end{tabularx}}
+
+\subsection*{Las dos pruebas de la defensa}
+\begin{comando}
+# 4.2  El circuit breaker en acción
+LATENCIA_MS=5000 docker compose up -d repartidores; sleep 10
+ID=$(nuevo_pedido); pagar $ID
+for i in 1 2 3 4 5 6; do echo -n "intento $i: "; aceptar_tiempo $ID $REP; done
+curl -s $B/estado; echo
+docker compose up -d repartidores    # se quita el retraso; a los 10 s el circuito prueba y se cierra
+
+# 4.1  La huella de la petición
+K="huella-$(date +%s)"
+CUERPO="{\"usuario_id\":\"$U\",\"restaurante_id\":\"$R\",\"platillos\":[{\"platillo_id\":\"$P\",\"cantidad\":1}]}"
+OTRO="{\"usuario_id\":\"$U\",\"restaurante_id\":\"$R\",\"platillos\":[{\"platillo_id\":\"$P\",\"cantidad\":3}]}"
+curl -s -o /dev/null -w "%{http_code}\n" -X POST $B/api/pedidos -H "Content-Type: application/json" -H "Idempotency-Key: $K" -d "$CUERPO"
+curl -s -o /dev/null -w "%{http_code}\n" -X POST $B/api/pedidos -H "Content-Type: application/json" -H "Idempotency-Key: $K" -d "$CUERPO"
+curl -s -w "\n%{http_code}\n"            -X POST $B/api/pedidos -H "Content-Type: application/json" -H "Idempotency-Key: $K" -d "$OTRO"
+\end{comando}
+
+\section{Regresión final: las etapas 1 a 3 sobre el código final}
+
+\queria Que la etapa 4 no rompió nada de lo anterior. El script \cod{documentacion/pruebas/regresion.sh}
+repite, por el gateway, las pruebas centrales de las etapas 1 a 3. Salida real del 18 de noviembre de 2026:
+
+\lstinputlisting[style=salida]{evidencia/regresion.txt}
+
+\observado Todo coincide con las bitácoras: un solo pedido con cinco peticiones iguales; un solo cobro
+con cinco pagos; un ganador en la aceptación simultánea; versión 4 tras cinco entregas; avisos v2, v3 y
+v4 con el \cod{outbox} publicado y la cola vacía; reparto 5 y 5 entre las copias; tres bases; y el pedido
+sin repartidor recibió el aviso de retraso, se canceló y se reembolsó. \hfill\ok
+
+\section{Pruebas con las interfaces}
+
+Además de \cod{curl}, el flujo completo se probó con las dos interfaces (ver el manual de usuario):
+
+\begin{itemize}
+  \item \textbf{Aplicación de escritorio} (\cod{Proyecto/interfaz/interfaz.py}): se creó un usuario, se
+        pidieron dos aguas frescas y un caldo (\$125.00), se pagó, la repartidora de la zona 3 aceptó y
+        entregó con el código, y el cliente vio los avisos v2, v3 y v4. Con repartidores detenido, la
+        pestaña Sistema mostró tres 503 de 1 s, luego 503 de 8 ms y la insignia del circuito en rojo.
+  \item \textbf{Panel web} (\url{http://localhost:8080/panel/}): carga el menú, la repartidora y la
+        cinta con las peticiones del gateway; insignias verdes con el sistema sano.
+\end{itemize}
+
+\section{Si algo falla}
+
+\begin{tabularx}{\linewidth}{@{}X X X@{}}
+\toprule
+\textsf{\textbf{Síntoma}} & \textsf{\textbf{Causa probable}} & \textsf{\textbf{Qué hacer}} \\
+\midrule
+\cod{relation ... does not exist} o una base que no existe & El volumen era de una etapa anterior & \cod{docker compose down -v} y levantar de nuevo \\
+El gateway responde 404 a todo & Traefik anterior a 3.6.1 con Docker 29 & El compose fija \cod{traefik:v3.6}; \cod{docker compose pull traefik} \\
+\cod{app} tarda en arrancar & Espera a que la base y RabbitMQ estén sanos & Esperar hasta 40 s; revisar \cod{docker compose ps} \\
+Variables \cod{U}, \cod{R}, \cod{P} o \cod{REP} vacías & El sistema aún no respondía al cargar \cod{comun.sh} & Volver a cargarlo \\
+El circuito no se cierra & No ha pasado la pausa de 10 s & Esperar y volver a intentar \\
+\cod{python3} no existe (Windows) & Python se llama \cod{python} & \cod{comun.sh} lo detecta solo (\cod{PY}) \\
+\bottomrule
+\end{tabularx}
+
+\end{document}

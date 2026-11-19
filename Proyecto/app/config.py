@@ -38,3 +38,10 @@ REPARTIDORES_CONNECT_TIMEOUT_SEG = float(os.getenv("REPARTIDORES_CONNECT_TIMEOUT
 # A partir de cuántos segundos pagado y sin repartidor se avisa al cliente que su pedido se retrasa.
 # Debe ser menor que TIMEOUT_ASIGNACION_SEG.
 UMBRAL_RETRASO_SEG = int(os.getenv("UMBRAL_RETRASO_SEG", "600"))
+
+# --- Etapa 4: resiliencia hacia repartidores ---
+# Circuit breaker: fallos seguidos que lo abren, y segundos abierto antes de dejar pasar una llamada de prueba
+BREAKER_FALLOS = int(os.getenv("BREAKER_FALLOS", "3"))
+BREAKER_PAUSA_SEG = float(os.getenv("BREAKER_PAUSA_SEG", "10"))
+# Reintentos por llamada a repartidores (solo en casos seguros, ver clientes/repartidores.py)
+REPARTIDORES_REINTENTOS = int(os.getenv("REPARTIDORES_REINTENTOS", "1"))

@@ -28,3 +28,9 @@ def registrar(conn, tipo, pedido, datos=None):
         "INSERT INTO pedidos.outbox (id, tipo, payload, creado_en) VALUES (%s, %s, %s, now())",
         (evento_id, tipo, Jsonb(payload)),
     )
+
+
+def contar_pendientes(conn):
+    """Eventos del outbox que aún no se publican a RabbitMQ (para GET /estado)."""
+    fila = conn.execute("SELECT count(*) AS n FROM pedidos.outbox WHERE publicado_en IS NULL").fetchone()
+    return fila["n"]

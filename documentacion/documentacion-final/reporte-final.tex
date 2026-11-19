@@ -1,0 +1,208 @@
+\documentclass[11pt]{article}
+\makeatletter\def\input@path{{../estilo/}}\makeatother
+\usepackage{didistribuidores}
+\renewcommand{\documentocorto}{Reporte final}
+
+\begin{document}
+\portada{Reporte final del proyecto}{Pedidos que no se pierden ni se cobran dos veces}%
+  {Un sistema distribuido de pedidos y entrega de comida, construido de monolito a servicios en cuatro etapas}%
+  {Ramas \cod{01-monolito}, \cod{02-separacion}, \cod{03-separacion} y \cod{04-resiliencia}}{28 de noviembre de 2026}
+
+\tableofcontents
+\newpage
+
+\section{El problema}
+
+Cuando alguien pide comida a domicilio en hora pico, las aplicaciones se ponen lentas, pierden pedidos
+o cobran dos veces. Muchas veces la causa es la propia red: la aplicación no recibe la respuesta,
+reintenta, y el servidor procesa el mismo pedido otra vez.
+
+\textbf{Para quién.} El usuario principal es el \textbf{cliente}: quiere pedir, pagar una sola vez y
+recibir su comida. Los secundarios son el \textbf{repartidor}, que acepta y entrega, y el
+\textbf{restaurante}, que prepara (en este alcance se asume que prepara todo pedido pagado).
+
+\textbf{Qué priorizamos.} La \textbf{consistencia sobre la disponibilidad}: preferimos retrasar o
+rechazar un pedido antes que perderlo, duplicarlo o cobrarlo dos veces. Las garantías que nunca se rompen:
+
+\begin{itemize}
+  \item Un reintento con la misma \cod{Idempotency-Key} devuelve el mismo pedido, sin segundo cobro.
+  \item Nunca se cobra un pedido que no se confirmó, y nunca se pierde uno ya confirmado.
+  \item La entrega se registra una sola vez, aunque el repartidor la confirme dos veces.
+  \item Si nadie toma un pedido pagado a tiempo, se cancela y se reembolsa, una sola vez.
+  \item Los avisos al cliente llegan una vez cada uno, aunque el servicio de avisos haya estado apagado.
+\end{itemize}
+
+\textbf{Por qué es un sistema distribuido.} Un aviso al cliente o la búsqueda de repartidor no deben
+impedir que un pedido se confirme; por eso \cod{notificaciones} y \cod{repartidores} corren en procesos
+aparte, cada uno con su base. \cod{repartidores} no guarda estado en memoria, así que corre en dos copias.
+Al comunicarse por la red aparecen los problemas del curso: tiempos límite, reintentos, duplicados,
+desorden y caídas.
+
+\section{Diagrama funcional}
+
+Los tres flujos principales, de punta a punta: qué hace la persona y qué partes del sistema intervienen.
+
+\begin{center}
+\input{diagrama-funcional}
+\end{center}
+
+\begin{nota}[Lo que pasa sin que nadie haga nada]
+Una tarea del núcleo revisa cada 5 segundos los pedidos: a los 30 s de pagado sin repartidor avisa al
+cliente del retraso; a los 60 s lo cancela y reembolsa en una sola transacción; un pedido sin pagar se
+cancela a los 30 s (valores de demostración; en producción, 10 y 20 minutos).
+\end{nota}
+
+\section{Diagrama de arquitectura}
+
+\begin{center}
+\input{diagrama-arquitectura}
+\end{center}
+
+\subsection{Dónde vive cada pieza}
+\begin{tabularx}{\linewidth}{@{}P{3cm} Y Y@{}}
+\toprule
+\textsf{\textbf{Pieza}} & \textsf{\textbf{Dónde vive}} & \textsf{\textbf{Si falla}} \\
+\midrule
+Gateway & Traefik v3.6, configurado por etiquetas de Docker. Rutas: \cod{/api/usuarios}, \cod{/api/restaurantes}, \cod{/api/pedidos}, \cod{/api/pagos}, \cod{/salud}, \cod{/estado}, \cod{/panel} al núcleo; \cod{/api/repartidores} y \cod{/api/notificaciones} a sus servicios & Nadie entra desde afuera, pero los servicios siguen hablándose y no se pierde nada (bitácora 4, prueba 7). Punto único de falla aceptado \\
+Directorio & DNS de Docker Compose: los servicios se buscan por nombre (\cod{repartidores}, \cod{rabbitmq}, \cod{db}) & El núcleo resuelve el nombre con tiempo límite de 1 s; si no se resuelve, 503 y el breaker se abre \\
+Balanceo & Traefik reparte por turnos entre las 2 copias de repartidores y saca a la que no contesta \cod{/salud}; las llamadas internas se reparten por el DNS & Con una copia caída, la otra atiende todo; con las dos, entra el breaker \\
+Datos & Una instancia de PostgreSQL con tres bases lógicas; cada servicio solo toca la suya & Durante un reinicio hay errores; después los pools se reconectan solos. Si cae para siempre, todo se detiene (declarado) \\
+Operaciones entre servicios & Eventos: \cod{outbox} + RabbitMQ (al menos una vez + consumidor idempotente). Consulta a repartidores: HTTP con tiempo límite, un reintento seguro y circuit breaker & Ver la sección~\ref{sec:fallas} \\
+\bottomrule
+\end{tabularx}
+
+\section{Cómo se construyó: cuatro etapas}
+
+\begin{tabularx}{\linewidth}{@{}l P{3.3cm} Y l@{}}
+\toprule
+\textsf{\textbf{Rama}} & \textsf{\textbf{Qué se agregó}} & \textsf{\textbf{Qué demuestra}} & \textsf{\textbf{Bitácora}} \\
+\midrule
+\cod{01-monolito} & Un proceso, una base, módulos con tres capas & Idempotencia con \cod{UNIQUE}, cambios de estado con \cod{UPDATE} condicional, pago y reembolso en una transacción, relojes, \cod{outbox} & 1 \\
+\cod{02-separacion} & \cod{notificaciones} aparte, RabbitMQ & Los pedidos funcionan con los avisos apagados; ningún aviso se pierde ni se duplica; DLQ; orden por versión & 2 \\
+\cod{03-separacion} & \cod{repartidores} aparte (2 copias), Traefik & Una sola entrada, balanceo, base propia, tiempo límite (503), aviso de retraso & 3 \\
+\cod{04-resiliencia} & Breaker, reintentos, huella, \cod{/estado}, interfaces & Fallar rápido, recuperarse solo, rechazar claves reutilizadas; matriz de caídas con Docker real & 4 \\
+\bottomrule
+\end{tabularx}
+
+Separar por etapas funcionó porque desde la etapa 1 cada módulo solo hablaba con otro por su
+\cod{servicio.py} y cada cambio de estado ya dejaba su evento: separar un servicio fue cambiar una llamada a
+función por una llamada de red, sin reescribir la lógica de pedidos.
+
+\section{Decisiones}
+
+{\small\begin{longtable}{@{}P{3.0cm} P{3.4cm} P{3.3cm} P{5.2cm}@{}}
+\toprule
+\textsf{\textbf{Decisión}} & \textsf{\textbf{Qué dejamos atrás}} & \textsf{\textbf{Alternativa descartada}} & \textsf{\textbf{Por qué}} \\
+\midrule
+\endhead
+Consistencia sobre disponibilidad & Aceptar cualquier pedido aunque algo falle; velocidad en hora pico & Responder siempre ``sí'' y corregir después & Preferimos un 503 claro a un pedido en el limbo o un doble cobro \\
+Idempotencia con \cod{UNIQUE} en la base & Simplicidad de revisar en código & Un diccionario en memoria que revisa si ya existe & Entre revisar y guardar hay un hueco; la base lo cierra de forma atómica (5 peticiones simultáneas: 1 pedido) \\
+\cod{pagos} dentro del núcleo & Un servicio de pagos independiente & Pagos como servicio con saga y compensación & Cobrar, cambiar el estado y reembolsar son una transacción local: no puede haber cobro sin pedido \\
+\cod{outbox} + RabbitMQ para los avisos & La simplicidad de una llamada directa & Llamar a notificaciones por HTTP dentro de la petición & Si los avisos fallan, el pedido no se bloquea ni se deshace; el evento nace en la misma transacción \\
+\emph{ack} después de guardar & Un poco de rendimiento & \emph{ack} automático al recibir & Con \emph{ack} temprano, una caída entre recibir y guardar perdería el aviso; así lo peor es un duplicado, que se ignora \\
+Repartidores informa, pedidos decide & Que repartidores asigne pedidos & Que el servicio de repartidores elija quién gana & La regla de quién gana vive con el dueño del estado: un \cod{UPDATE} condicional, sin cruzar la red \\
+503 si repartidores no responde & Disponibilidad al aceptar & Aceptar a ciegas & Sin preguntar no se sabe si el repartidor existe o es de esa zona \\
+Circuit breaker hecho a mano, solo hacia repartidores & Una librería probada & Una librería de resiliencia & Es la única llamada síncrona entre servicios; a mano se explica y se prueba línea por línea \\
+Una instancia de PostgreSQL con tres bases & Tolerancia a fallas de la base & Una instancia por servicio, o NoSQL & Cada servicio es dueño de sus datos sin multiplicar contenedores; el punto único de falla queda declarado \\
+Traefik y DNS de Compose & El ecosistema del lab (Java) & Spring Cloud Gateway y Eureka & Usamos Python; Docker ya resuelve nombres y Traefik se configura con etiquetas \\
+\bottomrule
+\end{longtable}}
+
+\section{Manejo de fallas}\label{sec:fallas}
+
+Todas las filas se comprobaron con el sistema real; la columna de evidencia apunta a la bitácora y la
+prueba. Las de la etapa 4 se corrieron en Docker Desktop el 18 de noviembre de 2026.
+
+{\small\begin{longtable}{@{}P{3.0cm} P{6.0cm} P{3.9cm} P{1.9cm}@{}}
+\toprule
+\textsf{\textbf{Qué se cae}} & \textsf{\textbf{Qué pasa}} & \textsf{\textbf{Qué lo resuelve}} & \textsf{\textbf{Evidencia}} \\
+\midrule
+\endhead
+Notificaciones & Los pedidos se crean, pagan y entregan; los avisos esperan en la cola y llegan al volver, una vez cada uno & Cola durable, \emph{ack} tardío, \cod{evento\_id} único & B2, p. 2 \\
+RabbitMQ & Los pedidos siguen; los eventos esperan en el \cod{outbox} y se publican al volver & Outbox y publicador que reintenta & B2, p. 6 \\
+RabbitMQ se reinicia & Los mensajes en cola sobreviven & Cola durable, mensajes persistentes, \cod{hostname} fijo & B2, p. 7 \\
+Una copia de repartidores & Nada se nota desde afuera & Traefik la saca del reparto & B3, p. 5 \\
+Las dos copias & Crear y pagar siguen; aceptar da 503 en 1 s y, tras 3 fallos, al instante; aviso de retraso; cancelación y reembolso al vencer & Tiempo límite, breaker, relojes & B3 p. 6; B4 p. 4 \\
+Repartidores lento & Tres intentos de 3 s y luego 503 en 7 ms; se recupera solo & Tiempo límite y breaker & B4, p. 2 \\
+Una copia congelada & Algunas llamadas internas tardan 3 s; el breaker puede abrirse & Parcial (limitación declarada) & B4, p. 3 \\
+El núcleo muere tras un pago & El evento sale al volver, una sola vez & Outbox en la misma transacción & B4, p. 5 \\
+PostgreSQL se reinicia & Errores unos segundos; luego todo se recupera sin reiniciar servicios & Pools con \cod{check\_connection} & B4, p. 6 \\
+El gateway & Nadie entra; adentro siguen hablándose & Llamada interna directa & B4, p. 7 \\
+Mensaje inválido o duplicado & Inválido a la DLQ sin bloquear; duplicado ignorado & \emph{nack} sin reencolar; \cod{UNIQUE} & B2, p. 3--4 \\
+Petición repetida o simultánea & Mismo pedido; un solo cobro; un solo ganador & \cod{UNIQUE} y \cod{UPDATE} condicional & B1, secc. 5--8 \\
+Clave reutilizada con otro pedido & 422 & Huella SHA-256 & B4, p. 1 \\
+\bottomrule
+\end{longtable}}
+
+\begin{nota}[Una falla que encontramos y corregimos con las pruebas reales]
+Con repartidores detenido en Docker Desktop para Windows, cada intento tardaba 8 s: resolver un nombre
+inexistente toma unos 4 s y el tiempo límite de \cod{httpx} no cubre esa parte (el reintento la
+duplicaba). Ahora el nombre se resuelve con su propio límite de 1 s y sin reintento: de 8 s a 1 s, y
+7 ms con el circuito abierto (bitácora 4, sección de hallazgos).
+\end{nota}
+
+\section{Cómo levantarlo y probarlo}
+
+\begin{comando}
+git clone https://github.com/YukiGab/sd-2027-1-didistribuidores
+cd sd-2027-1-didistribuidores/Proyecto
+docker compose up --build -d
+docker compose ps                       # siete contenedores
+curl http://localhost:8080/salud        # {"estado":"ok"}
+curl http://localhost:8080/estado       # circuito CERRADO, 0 eventos pendientes
+python interfaz/interfaz.py             # aplicación de escritorio (solo biblioteca estándar)
+\end{comando}
+
+\begin{itemize}
+  \item Panel web: \url{http://localhost:8080/panel/} · Swagger: \url{http://localhost:8080/docs} ·
+        Traefik: \url{http://localhost:8081} · RabbitMQ: \url{http://localhost:15672} (\cod{sd}/\cod{sd}).
+  \item Para empezar de cero: \cod{docker compose down -v} (los scripts de \cod{db/} solo corren con el
+        volumen vacío).
+  \item Las pruebas de cada etapa, con comandos y resultados: \cod{documentacion/pruebas/} (PDF y Word).
+        Las de la etapa 4 y la regresión son scripts que se pueden repetir tal cual.
+  \item El uso paso a paso, con capturas: \cod{documentacion/manual-de-usuario/}.
+\end{itemize}
+
+\textbf{Demostración sugerida (5 minutos).} 1) Pedir y pagar como cliente en la interfaz y repetir la
+petición: mismo pedido. 2) Aceptar y entregar como repartidor con el código; ver los tres avisos.
+3) \cod{docker compose stop notificaciones}, hacer un pedido, encenderlo y ver llegar los avisos.
+4) \cod{docker compose stop repartidores}: el circuito se pone en rojo y las respuestas son instantáneas;
+encenderlo y verlo cerrarse solo.
+
+\section{Qué falta y qué haríamos distinto}
+
+\begin{tabularx}{\linewidth}{@{}P{4.2cm} Y@{}}
+\toprule
+\textsf{\textbf{Qué falta}} & \textsf{\textbf{Cómo se resolvería}} \\
+\midrule
+PostgreSQL y Traefik son puntos únicos de falla & Réplicas de la base con failover y varias copias del gateway \\
+Las llamadas internas no usan los \emph{healthchecks}: una copia congelada recibe tráfico interno & Llamar a repartidores a través del gateway o con un directorio que conozca la salud \\
+El breaker vive en cada proceso del núcleo & Un breaker compartido (por ejemplo, en Redis) si hubiera varias copias del núcleo \\
+Sin autenticación: el usuario se identifica con su id y \cod{GET /api/pedidos/\{id\}} muestra el código de entrega a quien conozca el id & Autenticación con tokens; mostrar el código solo al dueño del pedido. (Sí se quitó el código de la lista que ve el repartidor.) \\
+Los mensajes de la cola de fallidos no se reprocesan & Una herramienta para revisarlos y reenviarlos \\
+Los avisos solo se guardan & Envío real por correo o notificación push \\
+La base del núcleo se llama \cod{didistribuidores} y el PRD dice \cod{pedidos\_db} & Renombrarla en una versión siguiente \\
+\bottomrule
+\end{tabularx}
+
+\textbf{Qué haríamos distinto.} Correr las pruebas contra Docker real desde el primer commit de cada etapa:
+el hallazgo del DNS solo apareció en Windows y al final. Automatizar esas pruebas en un pipeline (como los
+scripts de la etapa 4) en lugar de capturas manuales. Y definir desde el inicio una interfaz mínima, que
+ayudó mucho a explicar el sistema pero llegó en la última etapa.
+
+\section{Quién hizo qué}
+
+El reparto se acordó desde el inicio: \textbf{Erick} (Persona A) con las etapas 1 y 3 y \textbf{Yuki}
+(Persona B) con las etapas 2 y 4. Cada pull request lo revisó la otra persona antes de mezclarlo.
+
+\begin{tabularx}{\linewidth}{@{}P{4.2cm} Y@{}}
+\toprule
+\textsf{\textbf{Integrante}} & \textsf{\textbf{Aportes}} \\
+\midrule
+Erick Isaac Echeverria Goicochea (@ErickI07) & Etapa 1: módulos, esquema, idempotencia, pagos, aceptación, entrega, relojes con reembolso y sus pruebas. Etapa 3: servicio de repartidores con base propia y dos copias, Traefik, cliente HTTP con tiempo límite, aviso de retraso y sus 10 pruebas. Panel web de demostración. Bitácoras originales de las etapas 1 a 3. Revisión de las etapas 2 y 4. \\
+Yukioayax Canek Gabriel Hernández (@YukiGab) & Etapa 1: Docker Compose, datos semilla y tabla \cod{outbox}. Etapa 2: servicio de notificaciones, publicador del \cod{outbox}, RabbitMQ con DLQ y sus 7 pruebas. Etapa 4: circuit breaker, reintentos seguros, huella de la petición, \cod{/estado}, recuperación de los pools, pruebas reales de caídas, corrección del límite de la resolución de nombres e \cod{interfaz.py}. Documentación final: bitácoras en \LaTeX, pruebas, manual y este reporte. Revisión de las etapas 1 y 3. \\
+Los dos & PRD y decisiones de alcance (acordadas con el profesor), contrato de eventos, revisión cruzada de todos los pull requests y preparación de la defensa. \\
+\bottomrule
+\end{tabularx}
+
+\end{document}
