@@ -1,0 +1,272 @@
+<html><head><meta charset='utf-8'><title>Pruebas del proyecto</title><style>
+body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; color: #1d1d1f; }
+h1 { color: #1F3A68; font-size: 26pt; margin-bottom: 0; }
+h2 { color: #1F3A68; font-size: 16pt; border-bottom: 1px solid #C9CDD3; margin-top: 18pt; }
+h3 { color: #1F3A68; font-size: 13pt; }
+code { font-family: Consolas, monospace; font-size: 9.5pt; }
+pre { font-family: Consolas, monospace; font-size: 8.5pt; padding: 6pt; white-space: pre-wrap; }
+pre.comando { background: #1E1F24; color: #FFFFFF; }
+pre.salida { background: #F4F5F7; color: #000000; }
+div.nota { background: #F4F5F7; border-left: 4px solid #1F3A68; padding: 6pt 10pt; margin: 8pt 0; }
+table { border-collapse: collapse; width: 100%; font-size: 9.5pt; margin: 6pt 0; }
+th { text-align: left; border-bottom: 1.5px solid #000; padding: 3pt; font-family: Arial; }
+td { vertical-align: top; border-bottom: 0.5px solid #C9CDD3; padding: 3pt; }
+.ok { color: #1B7F3B; font-weight: bold; font-family: Arial; }
+.portada { color: #3D5AFE; font-family: Arial; }
+</style></head><body><p class="portada">DIDISTRIBUIDORES · PLAN Y RESULTADOS DE PRUEBAS</p>
+<h1>Pruebas del proyecto</h1><p>Cómo probar cada etapa, qué se espera y qué se obtuvo, de la etapa 1 a la 4</p>
+<p>Sistemas Distribuidos 2027-1, Grupo 2, FI-UNAM · Equipo: Erick Isaac Echeverria Goicochea (@ErickI07) y Yukioayax Canek Gabriel Hernández (@YukiGab) · https://github.com/YukiGab/sd-2027-1-didistribuidores · 18 de noviembre de 2026</p>
+<h2>Para qué sirve este documento</h2>
+<p>Reúne en un solo lugar <b>todas las pruebas del sistema</b>: cómo prepararlas, el comando exacto, el resultado esperado y el resultado obtenido. Las bitácoras de cada etapa (<code>documentacion/bitacora-1</code> a <code>bitacora-4</code>) traen la explicación detallada y las capturas; aquí está la versión de consulta rápida, pensada para repetir las pruebas antes de la presentación o durante la defensa.</p>
+<div class="nota"><b>Qué cambió respecto al documento “Pruebas proyecto 01-monolito”.</b> El documento anterior cubría las fases 1 y 2 con notas sueltas y capturas. Esta versión cubre las cuatro etapas, usa siempre el gateway (<code>http://localhost:8080</code>), corrige los identificadores partidos y los comandos con variables vacías del original, separa el resultado esperado del obtenido y agrega la regresión que se corrió el 18 de noviembre de 2026 sobre el código final.</div>
+<h3>Estado general</h3>
+<table>
+<tr><th><b>Etapa</b></th><th><b>Qué se prueba</b></th><th><b>Pruebas</b></th><th><b>Estado</b></th></tr>
+<tr><td>1</td><td>Monolito: idempotencia, pago, aceptación, entrega, relojes, outbox</td><td>14</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>2</td><td>Notificaciones aparte: RabbitMQ, cola durable, DLQ, consumidor idempotente</td><td>7</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>3</td><td>Repartidores aparte: gateway, dos copias, tiempo límite, aviso de retraso</td><td>10</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>4</td><td>Resiliencia: circuit breaker, reintentos, huella, recuperación</td><td>8</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>Final</td><td>Regresión de las etapas 1 a 3 sobre el código final</td><td>9</td><td><span class="ok">Cumple</span></td></tr>
+</table>
+<h2>Preparación</h2>
+<h3>Requisitos</h3>
+<p>Docker Desktop (o Docker Engine con Compose v2) y una terminal <b>bash</b> (Linux, macOS, WSL o Git Bash en Windows). Las funciones usan <code>curl</code> y <code>python3</code> (o <code>python</code>) para leer JSON.</p>
+<h3>Levantar el sistema desde cero</h3>
+<pre class="comando">cd Proyecto
+docker compose down -v          # borra los datos: los scripts de db/ solo corren con el volumen vacío
+docker compose up --build -d
+docker compose ps               # siete contenedores; db y rabbitmq en (healthy)
+curl -s http://localhost:8080/estado</pre>
+<h3>Variables y funciones auxiliares</h3>
+<p>Todas las pruebas usan las mismas variables. Se cargan con <code>source ../documentacion/bitacora-4/pruebas/comun.sh</code> desde <code>Proyecto/</code>:</p>
+<pre class="salida"># Variables y funciones auxiliares para las pruebas de la etapa 4.
+# Uso (desde Proyecto/, en bash o Git Bash):  source ../documentacion/bitacora-4/pruebas/comun.sh
+# Todas las peticiones van por el gateway, como las de cualquier cliente.
+
+B=${B:-http://localhost:8080}
+PY=${PY:-$(command -v python3 &gt;/dev/null 2&gt;&amp;1 &amp;&amp; echo python3 || echo python)}
+J=&#x27;import sys,json; print(json.load(sys.stdin)&#x27;
+
+# Muestra el comando (como en una terminal) y lo ejecuta. Sirve para que la evidencia
+# guarde exactamente lo que se corrió y lo que salió.
+paso() { echo &quot;\$ $*&quot;; eval &quot;$@&quot;; }
+
+U=$(curl -s -X POST $B/api/usuarios -H &quot;Content-Type: application/json&quot; -d &#x27;{&quot;nombre&quot;:&quot;Prueba E4&quot;,&quot;zona&quot;:3}&#x27; | $PY -c &quot;$J[&#x27;id&#x27;])&quot;)
+R=$(curl -s $B/api/restaurantes | $PY -c &quot;$J[0][&#x27;id&#x27;])&quot;)
+P=$(curl -s $B/api/restaurantes/$R/platillos | $PY -c &quot;$J[0][&#x27;id&#x27;])&quot;)
+REP=$(curl -s &quot;$B/api/repartidores?zona=3&quot; | $PY -c &quot;$J[0][&#x27;id&#x27;])&quot;)
+
+nuevo_pedido() {
+  curl -s -X POST $B/api/pedidos -H &quot;Content-Type: application/json&quot; -H &quot;Idempotency-Key: e4-$(date +%s%N)&quot; \
+    -d &quot;{\&quot;usuario_id\&quot;:\&quot;$U\&quot;,\&quot;restaurante_id\&quot;:\&quot;$R\&quot;,\&quot;platillos\&quot;:[{\&quot;platillo_id\&quot;:\&quot;$P\&quot;,\&quot;cantidad\&quot;:1}]}&quot; \
+    | $PY -c &quot;$J[&#x27;id&#x27;])&quot;
+}
+pagar()          { curl -s -X POST $B/api/pedidos/$1/pago &gt; /dev/null; }
+estado_pedido()  { curl -s $B/api/pedidos/$1 | $PY -c &quot;$J[&#x27;estado&#x27;])&quot;; }
+aceptar_tiempo() { curl -s -o /dev/null -w &quot;%{http_code} en %{time_total}s\n&quot; -X POST $B/api/pedidos/$1/aceptar \
+                     -H &quot;Content-Type: application/json&quot; -d &quot;{\&quot;repartidor_id\&quot;:\&quot;$2\&quot;}&quot;; }
+avisos()         { curl -s &quot;$B/api/notificaciones/pedido/$1&quot; \
+                     | $PY -c &quot;import sys,json; [print(a[&#x27;version_pedido&#x27;], a[&#x27;tipo&#x27;], &#x27;|&#x27;, a[&#x27;mensaje&#x27;]) for a in json.load(sys.stdin)]&quot;; }</pre>
+<table>
+<tr><th><b>Nombre</b></th><th><b>Qué es</b></th></tr>
+<tr><td><code>B</code></td><td>La dirección del gateway: la única entrada al sistema.</td></tr>
+<tr><td><code>U</code>, <code>R</code>, <code>P</code>, <code>REP</code></td><td>Usuario de prueba (zona 3), primer restaurante, su primer platillo y la repartidora de la zona 3.</td></tr>
+<tr><td><code>nuevo_pedido</code></td><td>Crea un pedido con una clave de idempotencia nueva y devuelve su id.</td></tr>
+<tr><td><code>pagar</code>, <code>estado_pedido</code></td><td>Paga un pedido; muestra su estado.</td></tr>
+<tr><td><code>aceptar_tiempo</code></td><td>Hace que un repartidor acepte un pedido y muestra el código HTTP y cuánto tardó.</td></tr>
+<tr><td><code>avisos</code></td><td>Los avisos que recibió el cliente por ese pedido (versión, tipo y mensaje).</td></tr>
+<tr><td><code>paso</code></td><td>Imprime el comando y lo ejecuta (así la evidencia guarda lo que se corrió).</td></tr>
+</table>
+<div class="nota"><b>En PowerShell.</b> Las mismas pruebas se pueden hacer con <code>curl.exe</code> e <code>Invoke-RestMethod</code>; la bitácora 2 trae los equivalentes (<code>Ciclo-Completo</code>, <code>Avisos</code>, <code>Cola</code>, <code>Psql</code>). La forma más sencilla en Windows es usar Git Bash, que trae <code>bash</code> y <code>curl</code>.</div>
+<h2>Etapa 1: monolito modular</h2>
+<p>Las pruebas originales se hicieron contra <code>localhost:8000</code>, antes de que existiera el gateway; con el código final se usa <code>$B</code>. Evidencia con capturas: bitácora 1.</p>
+<table>
+<tr><th><b>ID</b></th><th><b>Qué se prueba</b></th><th><b>Cómo</b></th><th><b>Esperado</b></th><th><b>Obtenido</b></th></tr>
+<tr><td>1.1</td><td>La app responde y está conectada a la base</td><td><code>curl $B/salud</code></td><td><code>{"estado":"ok"}</code></td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>1.2</td><td>Usuarios, restaurantes y menú</td><td><code>POST /api/usuarios</code>; <code>GET /api/restaurantes</code> y su menú</td><td>201 y listas; id mal formado da 422</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>1.3</td><td>Reintento con la misma clave</td><td>El mismo <code>POST /api/pedidos</code> dos veces</td><td>201 y luego 200 con el mismo id</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>1.4</td><td>Cinco pedidos simultáneos con la misma clave</td><td>5 <code>curl</code> en paralelo y <code>count(*)</code></td><td>Un 201, cuatro 200, <code>count = 1</code></td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>1.5</td><td>Sin <code>Idempotency-Key</code></td><td><code>POST</code> sin el encabezado</td><td>400</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>1.6</td><td>Platillo o usuario inexistente</td><td><code>POST</code> con ids inventados</td><td>422 / 404</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>1.7</td><td>Pago repetido</td><td>Pagar dos veces y <code>GET /api/pagos/{id}</code></td><td>200, 200, un cobro, versión 2</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>1.8</td><td>Cinco pagos simultáneos</td><td>5 pagos en paralelo</td><td>Cinco 200; <code>cobros = 1</code>, <code>version = 2</code></td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>1.9</td><td>Pedidos disponibles por zona</td><td><code>GET .../disponibles</code> con el <code>repartidor_id</code></td><td>Solo pedidos pagados de su zona</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>1.10</td><td>Dos repartidores aceptan a la vez</td><td>2 aceptaciones en paralelo</td><td>Un 200, un 409; versión 3</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>1.11</td><td>Otra zona / sin pagar</td><td>Aceptar con repartidor de otra zona; pedido sin pagar</td><td>422 / 409</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>1.12</td><td>Entrega con código</td><td>Incorrecto, correcto, repetido; 5 en paralelo</td><td>422, 200, 200; <code>ENTREGADO</code> versión 4</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>1.13</td><td>Relojes de cancelación</td><td>Esperar 40 s sin pagar; 70 s pagado sin repartidor</td><td><code>sin_pago</code>; <code>sin_repartidor</code> y <code>REEMBOLSADO</code></td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>1.14</td><td>Infraestructura y outbox</td><td><code>down -v</code>, <code>up</code>, conteos y <code> pedidos.outbox</code></td><td>3 restaurantes, 9 platillos, 5 repartidores; 3 eventos por pedido</td><td><span class="ok">Cumple</span></td></tr>
+</table>
+<h3>Comandos clave</h3>
+<pre class="comando"># 1.4  Cinco peticiones simultáneas con la misma clave
+K=&quot;clave-$(date +%s)&quot;; C=&quot;{\&quot;usuario_id\&quot;:\&quot;$U\&quot;,\&quot;restaurante_id\&quot;:\&quot;$R\&quot;,\&quot;platillos\&quot;:[{\&quot;platillo_id\&quot;:\&quot;$P\&quot;,\&quot;cantidad\&quot;:2}]}&quot;
+for i in 1 2 3 4 5; do curl -s -o /dev/null -w &quot;%{http_code} &quot; -X POST $B/api/pedidos \
+  -H &quot;Content-Type: application/json&quot; -H &quot;Idempotency-Key: $K&quot; -d &quot;$C&quot; &amp; done; wait; echo
+docker compose exec -T db psql -U postgres -d didistribuidores \
+  -c &quot;SELECT count(*) FROM pedidos.pedidos WHERE clave_idempotencia=&#x27;$K&#x27;&quot;
+
+# 1.8  Cinco pagos simultáneos
+ID=$(nuevo_pedido)
+for i in 1 2 3 4 5; do curl -s -o /dev/null -w &quot;%{http_code} &quot; -X POST $B/api/pedidos/$ID/pago &amp; done; wait
+
+# 1.12 Entrega: leer el código y confirmarlo
+COD=$(curl -s $B/api/pedidos/$ID | python3 -c &quot;$J[&#x27;codigo_entrega&#x27;])&quot;)
+curl -s -X POST $B/api/pedidos/$ID/entrega -H &quot;Content-Type: application/json&quot; -d &quot;{\&quot;codigo\&quot;:\&quot;$COD\&quot;}&quot;</pre>
+<h2>Etapa 2: notificaciones como servicio aparte</h2>
+<p>Evidencia con capturas: bitácora 2. <code>herramientas/publicar_prueba.py</code> publica eventos de prueba directamente en RabbitMQ (válidos, duplicados, inválidos o desordenados).</p>
+<table>
+<tr><th><b>ID</b></th><th><b>Qué se prueba</b></th><th><b>Cómo</b></th><th><b>Esperado</b></th><th><b>Obtenido</b></th></tr>
+<tr><td>2.0</td><td>Arranque y colas</td><td><code>/estado</code>; consola <a href="http://localhost:15672">http://localhost:15672</a></td><td>Colas <code>notificaciones.pedidos</code> y <code>.dlq</code> durables</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>2.1</td><td>Flujo normal</td><td>Pedido completo; <code>avisos $ID</code></td><td>Avisos v2, v3, v4; outbox publicado</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>2.2</td><td>Notificaciones apagado (5.2 CA1--CA2)</td><td><code>docker compose stop notificaciones</code>, pedido completo, <code>start</code></td><td>Pedido <code>ENTREGADO</code>; 3 mensajes esperan; al volver, 3 avisos una vez</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>2.3</td><td>Evento duplicado</td><td><code>publicar_prueba.py --evento-id X --veces 3</code></td><td>Un aviso; 2 “Evento repetido”</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>2.4</td><td>Mensaje inválido (5.2 CA3)</td><td><code>publicar_prueba.py --invalido</code></td><td>1 mensaje en la DLQ; el siguiente evento se guarda</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>2.5</td><td>Eventos desordenados</td><td>Versión 4 antes que la 3</td><td>Ordenados por versión; <code>/ultimo</code> da la 4</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>2.6</td><td>RabbitMQ caído</td><td><code>stop rabbitmq</code>, pedido, <code>start</code></td><td>Pedido avanza; pendientes en outbox; luego 0</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>2.7</td><td>Reinicio de RabbitMQ</td><td><code>restart rabbitmq</code> con mensajes en cola</td><td>Los mensajes sobreviven</td><td><span class="ok">Cumple</span></td></tr>
+</table>
+<h3>Comandos clave</h3>
+<pre class="comando">cola() { docker compose exec -T rabbitmq rabbitmqctl list_queues name messages consumers; }
+
+# 2.2  Notificaciones apagado
+docker compose stop notificaciones
+ID=$(nuevo_pedido); pagar $ID      # (y aceptar y entregar, como en 1.12)
+sleep 3; cola                      # notificaciones.pedidos  3  0
+docker compose start notificaciones; sleep 6; avisos $ID; cola
+
+# 2.3 y 2.4  Duplicado e inválido
+PD=$(python3 -c &quot;import uuid; print(uuid.uuid4())&quot;); EV=$(python3 -c &quot;import uuid; print(uuid.uuid4())&quot;)
+docker compose exec -T notificaciones python herramientas/publicar_prueba.py --pedido-id $PD --evento-id $EV --veces 3
+docker compose exec -T notificaciones python herramientas/publicar_prueba.py --invalido</pre>
+<h2>Etapa 3: repartidores como servicio y gateway</h2>
+<p>Evidencia con capturas: bitácora 3.</p>
+<table>
+<tr><th><b>ID</b></th><th><b>Qué se prueba</b></th><th><b>Cómo</b></th><th><b>Esperado</b></th><th><b>Obtenido</b></th></tr>
+<tr><td>3.0</td><td>Despliegue</td><td><code>docker compose ps</code>; panel de Traefik (:8081)</td><td>7 contenedores; 3 routers; 2 servidores de repartidores</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>3.1</td><td>Enrutamiento</td><td>Una petición a cada servicio por <code>$B</code></td><td>Contestan núcleo, repartidores y notificaciones</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>3.2</td><td>Balanceo</td><td>10 consultas contando <code>X-Instancia</code></td><td>5 y 5</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>3.3</td><td>Pedido completo por el gateway</td><td>Crear, pagar, aceptar, entregar</td><td>Avisos 2, 3, 4; la llamada interna no pasa por Traefik</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>3.4</td><td>Aceptación simultánea</td><td>Dos repartidores a la vez</td><td>200 y 409</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>3.5</td><td>Cae una copia</td><td><code>docker stop</code> de una copia</td><td>Diez 200; al volver, 5 y 5</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>3.6</td><td>Caen las dos copias</td><td><code>docker compose stop repartidores</code></td><td>Pedido <code>PAGADO</code>; aceptar da 503; aviso de retraso; cancelación con reembolso</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>3.7</td><td>Repartidores lento</td><td><code>LATENCIA_MS=5000 docker compose up -d repartidores</code></td><td>503 a los 3 s</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>3.8</td><td>Una base por servicio</td><td><code>psql -c ""</code></td><td><code>didistribuidores</code>, <code>notificaciones_db</code>, <code>repartidores_db</code></td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>3.9</td><td>Disponibilidad</td><td><code>PATCH</code> con <code>disponible:false</code> y aceptar</td><td>422 “no está disponible”</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>3.10</td><td>Única entrada</td><td><code>docker compose ps --format ...Ports</code></td><td>Solo Traefik expone la aplicación</td><td><span class="ok">Cumple</span></td></tr>
+</table>
+<h2>Etapa 4: resiliencia</h2>
+<p>Cada prueba es un script en <code>documentacion/bitacora-4/pruebas/</code> (<code>prueba-0.sh</code> a <code>prueba-7.sh</code>); se corre con <code>source</code> después de <code>comun.sh</code>. Salidas completas y análisis: bitácora 4.</p>
+<table>
+<tr><th><b>ID</b></th><th><b>Qué se prueba</b></th><th><b>Esperado</b></th><th><b>Obtenido (18/11/2026)</b></th><th><b>Estado</b></th></tr>
+<tr><td>4.0</td><td>Arranque y <code>/estado</code></td><td><code>CERRADO</code>, 0 pendientes</td><td>Igual</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>4.1</td><td>Clave reutilizada con otro pedido</td><td>201, 200, 422</td><td>201, 200, 422; un solo pedido</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>4.2</td><td>Repartidores lento y breaker</td><td>3 intentos de 3 s, luego instantáneos; se recupera</td><td>3.02 s ×3, luego 7 ms; <code>ABIERTO</code> → <code>CERRADO</code></td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>4.3</td><td>Una copia congelada</td><td>Mezcla de 200 y 503 de 3 s</td><td>Igual; además el circuito se abrió (3 fallos seguidos)</td><td><span class="ok">Cumple</span> (hallazgo)</td></tr>
+<tr><td>4.4</td><td>Repartidores caído</td><td>503 rápido y circuito abierto</td><td>Antes: 8 s; tras el arreglo: 1 s y luego 7 ms</td><td><span class="ok">Cumple</span> (corregido)</td></tr>
+<tr><td>4.5</td><td>El núcleo muere tras un pago</td><td>El evento sale al volver, una vez</td><td>1 pendiente → 0; un aviso de pago</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>4.6</td><td>PostgreSQL se reinicia</td><td>Todo se recupera sin reiniciar servicios</td><td>Igual</td><td><span class="ok">Cumple</span></td></tr>
+<tr><td>4.7</td><td>El gateway se cae</td><td>000 afuera; adentro sí hay comunicación</td><td>Igual</td><td><span class="ok">Cumple</span></td></tr>
+</table>
+<h3>Las dos pruebas de la defensa</h3>
+<pre class="comando"># 4.2  El circuit breaker en acción
+LATENCIA_MS=5000 docker compose up -d repartidores; sleep 10
+ID=$(nuevo_pedido); pagar $ID
+for i in 1 2 3 4 5 6; do echo -n &quot;intento $i: &quot;; aceptar_tiempo $ID $REP; done
+curl -s $B/estado; echo
+docker compose up -d repartidores    # se quita el retraso; a los 10 s el circuito prueba y se cierra
+
+# 4.1  La huella de la petición
+K=&quot;huella-$(date +%s)&quot;
+CUERPO=&quot;{\&quot;usuario_id\&quot;:\&quot;$U\&quot;,\&quot;restaurante_id\&quot;:\&quot;$R\&quot;,\&quot;platillos\&quot;:[{\&quot;platillo_id\&quot;:\&quot;$P\&quot;,\&quot;cantidad\&quot;:1}]}&quot;
+OTRO=&quot;{\&quot;usuario_id\&quot;:\&quot;$U\&quot;,\&quot;restaurante_id\&quot;:\&quot;$R\&quot;,\&quot;platillos\&quot;:[{\&quot;platillo_id\&quot;:\&quot;$P\&quot;,\&quot;cantidad\&quot;:3}]}&quot;
+curl -s -o /dev/null -w &quot;%{http_code}\n&quot; -X POST $B/api/pedidos -H &quot;Content-Type: application/json&quot; -H &quot;Idempotency-Key: $K&quot; -d &quot;$CUERPO&quot;
+curl -s -o /dev/null -w &quot;%{http_code}\n&quot; -X POST $B/api/pedidos -H &quot;Content-Type: application/json&quot; -H &quot;Idempotency-Key: $K&quot; -d &quot;$CUERPO&quot;
+curl -s -w &quot;\n%{http_code}\n&quot;            -X POST $B/api/pedidos -H &quot;Content-Type: application/json&quot; -H &quot;Idempotency-Key: $K&quot; -d &quot;$OTRO&quot;</pre>
+<h2>Regresión final: las etapas 1 a 3 sobre el código final</h2>
+<p><b>Qué queríamos comprobar.</b> Que la etapa 4 no rompió nada de lo anterior. El script <code>documentacion/pruebas/regresion.sh</code> repite, por el gateway, las pruebas centrales de las etapas 1 a 3. Salida real del 18 de noviembre de 2026:</p>
+<pre class="salida">### E1. Cinco peticiones simultáneas con la misma Idempotency-Key
+$ for i in 1 2 3 4 5; do curl -s -o /dev/null -w &quot;%{http_code} &quot; -X POST $B/api/pedidos -H &quot;Content-Type: application/json&quot; -H &quot;Idempotency-Key: $K&quot; -d &quot;$C&quot; &amp; done; wait; echo
+201 200 200 200 200 
+$ psql_db &quot;SELECT count(*) AS pedidos FROM pedidos.pedidos WHERE clave_idempotencia=&#x27;$K&#x27;&quot;
+ pedidos 
+---------
+       1
+(1 row)
+
+### E1. Peticiones inválidas: sin clave (400), usuario inexistente (404)
+$ curl -s -w &quot; -&gt; %{http_code}\n&quot; -X POST $B/api/pedidos -H &quot;Content-Type: application/json&quot; -d &quot;$C&quot;
+{&quot;detail&quot;:&quot;Falta el header Idempotency-Key&quot;} -&gt; 400
+$ curl -s -w &quot; -&gt; %{http_code}\n&quot; -X POST $B/api/pedidos -H &quot;Content-Type: application/json&quot; -H &quot;Idempotency-Key: x-$K&quot; -d &quot;{\&quot;usuario_id\&quot;:\&quot;00000000-0000-0000-0000-000000000000\&quot;,\&quot;restaurante_id\&quot;:\&quot;$R\&quot;,\&quot;platillos\&quot;:[{\&quot;platillo_id\&quot;:\&quot;$P\&quot;,\&quot;cantidad\&quot;:1}]}&quot;
+{&quot;detail&quot;:&quot;Usuario no encontrado&quot;} -&gt; 404
+### E1. Cinco pagos simultáneos: un solo cobro
+$ for i in 1 2 3 4 5; do curl -s -o /dev/null -w &quot;%{http_code} &quot; -X POST $B/api/pedidos/$ID/pago &amp; done; wait; echo
+200 200 200 200 200 
+$ psql_db &quot;SELECT (SELECT count(*) FROM pagos.pagos WHERE pedido_id=&#x27;$ID&#x27;) AS cobros, (SELECT version FROM pedidos.pedidos WHERE id=&#x27;$ID&#x27;) AS version&quot;
+ cobros | version 
+--------+---------
+      1 |       2
+(1 row)
+
+### E1/E3. Dos repartidores aceptan a la vez: uno gana (200) y el otro 409
+$ ( curl -s -o /dev/null -w &quot;REP: %{http_code}\n&quot; -X POST $B/api/pedidos/$ID/aceptar -H &quot;Content-Type: application/json&quot; -d &quot;{\&quot;repartidor_id\&quot;:\&quot;$REP\&quot;}&quot; &amp; curl -s -o /dev/null -w &quot;REP2: %{http_code}\n&quot; -X POST $B/api/pedidos/$ID/aceptar -H &quot;Content-Type: application/json&quot; -d &quot;{\&quot;repartidor_id\&quot;:\&quot;$REP2\&quot;}&quot; &amp; wait )
+REP: 200
+REP2: 409
+### E1. Entrega: código incorrecto (422), cinco correctas a la vez, versión 4
+$ curl -s -o /dev/null -w &quot;%{http_code}\n&quot; -X POST $B/api/pedidos/$ID/entrega -H &quot;Content-Type: application/json&quot; -d &quot;{\&quot;codigo\&quot;:\&quot;000000\&quot;}&quot;
+422
+$ for i in 1 2 3 4 5; do curl -s -o /dev/null -w &quot;%{http_code} &quot; -X POST $B/api/pedidos/$ID/entrega -H &quot;Content-Type: application/json&quot; -d &quot;{\&quot;codigo\&quot;:\&quot;$COD\&quot;}&quot; &amp; done; wait; echo
+200 200 200 200 200 
+$ psql_db &quot;SELECT estado, version FROM pedidos.pedidos WHERE id=&#x27;$ID&#x27;&quot;
+  estado   | version 
+-----------+---------
+ ENTREGADO |       4
+(1 row)
+
+### E2. Los avisos llegan por RabbitMQ, uno por cambio de estado, y el outbox queda publicado
+$ avisos $ID
+2 pedido.pagado | Recibimos tu pago de $25.00. Estamos buscando un repartidor.
+3 pedido.asignado | Un repartidor aceptó tu pedido.
+4 pedido.entregado | Tu pedido fue entregado. ¡Buen provecho!
+$ psql_db &quot;SELECT tipo, publicado_en IS NOT NULL AS publicado FROM pedidos.outbox WHERE payload-&gt;&gt;&#x27;pedidoId&#x27;=&#x27;$ID&#x27; ORDER BY creado_en&quot;
+       tipo       | publicado 
+------------------+-----------
+ pedido.pagado    | t
+ pedido.asignado  | t
+ pedido.entregado | t
+(3 rows)
+
+$ docker compose exec -T rabbitmq rabbitmqctl list_queues name messages consumers 2&gt;/dev/null | grep notificaciones
+notificaciones.pedidos	0	1
+notificaciones.pedidos.dlq	0	0
+### E3. Balanceo: 10 consultas por el gateway, X-Instancia
+$ for i in $(seq 1 10); do curl -s -D - -o /dev/null &quot;$B/api/repartidores?zona=3&quot; | grep -i x-instancia; done | sort | uniq -c
+      5 X-Instancia: 136ad4734e0f
+      5 X-Instancia: ac88e6b8f323
+### E3. Tres bases separadas
+$ docker compose exec -T db psql -U postgres -c &quot;\l&quot; | grep -E &quot;didistribuidores|notificaciones_db|repartidores_db&quot; | cut -c1-40
+ didistribuidores  | postgres | UTF8    
+ notificaciones_db | postgres | UTF8    
+ repartidores_db   | postgres | UTF8    
+### E1/E3. Cancelación por tiempo con reembolso y aviso de retraso (espera 75 s)
+$ curl -s $B/api/pedidos/$ID2 | $PY -c &quot;import sys,json; p=json.load(sys.stdin); print(p[\&quot;estado\&quot;], p[\&quot;motivo_cancelacion\&quot;])&quot;
+CANCELADO sin_repartidor
+$ curl -s $B/api/pagos/$ID2 | $PY -c &quot;$J[&#x27;estado&#x27;])&quot;
+REEMBOLSADO
+$ avisos $ID2
+2 pedido.pagado | Recibimos tu pago de $25.00. Estamos buscando un repartidor.
+2 pedido.retrasado | Tu pedido se está retrasando: seguimos buscando un repartidor.
+3 pedido.cancelado | Cancelamos tu pedido porque no encontramos repartidor. Tu pago fue reembolsado.</pre>
+<p><b>Qué se observó.</b> Todo coincide con las bitácoras: un solo pedido con cinco peticiones iguales; un solo cobro con cinco pagos; un ganador en la aceptación simultánea; versión 4 tras cinco entregas; avisos v2, v3 y v4 con el <code>outbox</code> publicado y la cola vacía; reparto 5 y 5 entre las copias; tres bases; y el pedido sin repartidor recibió el aviso de retraso, se canceló y se reembolsó. <span class="ok">Cumple</span></p>
+<h2>Pruebas con las interfaces</h2>
+<p>Además de <code>curl</code>, el flujo completo se probó con las dos interfaces (ver el manual de usuario):</p>
+<ul><li> <b>Aplicación de escritorio</b> (<code>Proyecto/interfaz/interfaz.py</code>): se creó un usuario, se pidieron dos aguas frescas y un caldo ($125.00), se pagó, la repartidora de la zona 3 aceptó y entregó con el código, y el cliente vio los avisos v2, v3 y v4. Con repartidores detenido, la pestaña Sistema mostró tres 503 de 1 s, luego 503 de 8 ms y la insignia del circuito en rojo. </li><li> <b>Panel web</b> (<a href="http://localhost:8080/panel/">http://localhost:8080/panel/</a>): carga el menú, la repartidora y la cinta con las peticiones del gateway; insignias verdes con el sistema sano.</li></ul>
+<h2>Si algo falla</h2>
+<table>
+<tr><th><b>Síntoma</b></th><th><b>Causa probable</b></th><th><b>Qué hacer</b></th></tr>
+<tr><td><code>relation ... does not exist</code> o una base que no existe</td><td>El volumen era de una etapa anterior</td><td><code>docker compose down -v</code> y levantar de nuevo</td></tr>
+<tr><td>El gateway responde 404 a todo</td><td>Traefik anterior a 3.6.1 con Docker 29</td><td>El compose fija <code>traefik:v3.6</code>; <code>docker compose pull traefik</code></td></tr>
+<tr><td><code>app</code> tarda en arrancar</td><td>Espera a que la base y RabbitMQ estén sanos</td><td>Esperar hasta 40 s; revisar <code>docker compose ps</code></td></tr>
+<tr><td>Variables <code>U</code>, <code>R</code>, <code>P</code> o <code>REP</code> vacías</td><td>El sistema aún no respondía al cargar <code>comun.sh</code></td><td>Volver a cargarlo</td></tr>
+<tr><td>El circuito no se cierra</td><td>No ha pasado la pausa de 10 s</td><td>Esperar y volver a intentar</td></tr>
+<tr><td><code>python3</code> no existe (Windows)</td><td>Python se llama <code>python</code></td><td><code>comun.sh</code> lo detecta solo (<code>PY</code>)</td></tr>
+</table></body></html>

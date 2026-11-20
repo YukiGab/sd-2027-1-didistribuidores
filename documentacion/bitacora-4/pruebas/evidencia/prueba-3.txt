@@ -1,0 +1,20 @@
+$ docker pause $COPIA
+62e0083c30e6384b1892c4cfd7611e379b63f0d80faae327ca1070fb24b04a35
+$ for i in $(seq 1 8); do curl -s -o /dev/null -w "%{http_code} en %{time_total}s\n" "$B/api/pedidos/disponibles?repartidor_id=$REP"; done
+503 en 3.033809s
+503 en 3.055025s
+200 en 0.027999s
+503 en 3.025179s
+503 en 3.020623s
+503 en 3.028061s
+503 en 0.006478s
+503 en 0.006378s
+$ curl -s $B/estado; echo
+{"repartidores":{"circuito":"ABIERTO","fallos_seguidos":3,"abierto_desde_hace_seg":0.3},"outbox_pendientes":0}
+$ docker compose logs app 2>&1 | grep -E "\[repartidores\]|circuito" | tail -4
+app-1  | WARNING:  [repartidores] sin respuesta a tiempo (ReadTimeout: timed out)
+app-1  | WARNING:  [repartidores] sin respuesta a tiempo (ReadTimeout: timed out)
+app-1  | WARNING:  [repartidores] sin respuesta a tiempo (ReadTimeout: timed out)
+app-1  | WARNING:  [circuito repartidores] CERRADO -> ABIERTO (3 fallos seguidos)
+$ docker unpause $COPIA
+62e0083c30e6384b1892c4cfd7611e379b63f0d80faae327ca1070fb24b04a35

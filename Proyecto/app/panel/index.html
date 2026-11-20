@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DiDistribuidores</title>
+<style>
+:root{--bg:#f5f5f7;--card:#fff;--fill:#f2f2f7;--line:#e5e5ea;--tx:#1d1d1f;--mu:#6e6e73;--ac:#0071e3;--ok:#34c759;--wr:#ff9f0a;--er:#ff3b30;--glass:rgba(245,245,247,.72);--sh:0 1px 2px rgba(0,0,0,.04),0 8px 30px rgba(0,0,0,.06)}
+@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--fill:#2c2c2e;--line:#38383a;--tx:#f5f5f7;--mu:#98989d;--ac:#0a84ff;--ok:#30d158;--wr:#ff9f0a;--er:#ff453a;--glass:rgba(0,0,0,.7);--sh:0 0 0 1px rgba(255,255,255,.04)}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.47 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:3px solid color-mix(in srgb,var(--ac) 55%,transparent);outline-offset:2px}
+[hidden]{display:none!important}
+.bar{position:sticky;top:0;z-index:5;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;padding:10px 22px;background:var(--glass);backdrop-filter:saturate(180%) blur(22px);-webkit-backdrop-filter:saturate(180%) blur(22px);border-bottom:1px solid var(--line)}
+.logo{font-weight:600;letter-spacing:-.01em}
+.tabs{display:flex;background:var(--fill);border-radius:10px;padding:2px}
+.tabs button{border:0;background:none;padding:5px 18px;border-radius:8px;font-size:13px;font-weight:500;color:var(--mu)}
+.tabs button[aria-selected=true]{background:var(--card);color:var(--tx);box-shadow:0 1px 3px rgba(0,0,0,.14)}
+.pills{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.pill{display:flex;align-items:center;gap:6px;padding:3px 11px;border-radius:99px;background:var(--fill);color:var(--mu);font-size:12px;font-weight:500}
+.pill i{width:8px;height:8px;border-radius:50%;background:var(--mu)}
+.pill.ok i{background:var(--ok)}.pill.wr i{background:var(--wr)}.pill.er i{background:var(--er)}.pill.er{color:var(--er)}
+@media(max-width:760px){.bar{grid-template-columns:1fr;justify-items:center}.pills{justify-content:center}}
+main{max-width:1040px;margin:0 auto;padding:0 22px 80px}
+.hero{text-align:center;padding:64px 0 34px}
+h1{margin:0 auto 12px;max-width:14ch;font-size:clamp(38px,7vw,68px);line-height:1.03;font-weight:700;letter-spacing:-.035em}
+.sub{margin:0 auto 26px;max-width:44ch;color:var(--mu);font-size:19px;line-height:1.4}
+.cta{display:flex;gap:18px;justify-content:center;align-items:center;flex-wrap:wrap}
+.go{background:var(--ac);color:#fff;border:0;border-radius:980px;padding:12px 26px;font-size:17px;font-weight:500;transition:transform .15s,filter .15s}
+.go:hover{filter:brightness(1.08)}.go:active{transform:scale(.97)}.go:disabled{opacity:.5;cursor:wait}
+.link{background:none;border:0;color:var(--ac);font-size:17px;padding:8px}.link:hover{text-decoration:underline}
+.hint{margin:14px 0 0;color:var(--mu);font-size:13px}
+.panel{background:var(--card);border-radius:22px;padding:22px;box-shadow:var(--sh)}
+.order{max-width:720px;margin:34px auto 0;text-align:left}
+.steps{display:flex;gap:6px;margin-bottom:18px}
+.st{flex:1;padding:10px 4px;text-align:center;font-size:11.5px;font-weight:500;border-radius:10px;background:var(--fill);color:var(--mu);transition:background .3s,color .3s}
+.st.on{background:var(--ac);color:#fff}.st.bad{background:var(--er);color:#fff}
+.kv{display:grid;grid-template-columns:92px 1fr;gap:5px 10px;font-size:14px}.kv b{color:var(--mu);font-weight:400}.kv span{overflow-wrap:anywhere}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:12.5px}
+.av{list-style:none;margin:14px 0 0;padding:0}.av li{padding:10px 0;border-top:1px solid var(--line)}.av small{display:block;color:var(--mu);font-size:12px}
+.cols{display:grid;grid-template-columns:1fr 1.15fr;gap:16px;margin-top:38px}@media(max-width:860px){.cols{grid-template-columns:1fr}}
+h2{margin:0 0 12px;font-size:21px;font-weight:600;letter-spacing:-.02em}
+.guion{list-style:none;margin:0;padding:0}
+.guion li{display:flex;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line);color:var(--mu)}.guion li:first-child{border-top:0}
+.guion .m{width:24px;height:24px;border-radius:50%;background:var(--fill);flex:none;display:grid;place-items:center;font-size:13px;font-weight:700;color:#fff}
+.guion li.run,.guion li.ok,.guion li.er{color:var(--tx)}
+.guion li.run .m{background:none;border:2.5px solid var(--ac);border-top-color:transparent;animation:g .8s linear infinite}
+.guion li.ok .m{background:var(--ok)}.guion li.er .m{background:var(--er)}
+.guion .t{margin-left:auto;font-size:12px;color:var(--mu);white-space:nowrap}
+@keyframes g{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.guion li.run .m{animation:none}.st,.go{transition:none}}
+.win{background:#1c1c1e;border-radius:22px;overflow:hidden;box-shadow:var(--sh);display:flex;flex-direction:column}
+.win .top{display:flex;gap:7px;align-items:center;padding:13px 16px;background:#2c2c2e;color:#98989d;font-size:12px}
+.win .top i{width:12px;height:12px;border-radius:50%;background:#ff5f57}.win .top i+i{background:#febc2e}.win .top i+i+i{background:#28c840}.win .top span{margin:0 auto;transform:translateX(-18px)}
+.tape{height:290px;overflow:auto;padding:12px 16px;font:12.5px/1.6 ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+.tape div{white-space:pre-wrap;color:#98989d}.tape .s2{color:#30d158}.tape .s4{color:#ff9f0a}.tape .s5,.tape .s0{color:#ff453a}
+.tools{display:flex;gap:8px;flex-wrap:wrap;padding:12px 16px;background:#2c2c2e}.tools button{border:0;border-radius:980px;padding:6px 14px;background:#3a3a3c;color:#f5f5f7;font-size:13px}.tools button:hover{background:#48484a}
+.chips{display:flex;gap:6px;padding:0 16px 12px;background:#2c2c2e}.chips:empty{display:none}.chip{background:#3a3a3c;color:#f5f5f7;border-radius:8px;padding:2px 9px;font:12px ui-monospace,monospace}
+.sec{text-align:center;margin:70px 0 22px}.sec h2{font-size:34px;letter-spacing:-.03em;margin:0}.sec p{margin:6px 0 0;color:var(--mu);font-size:17px}
+.fl{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.fl .panel{display:flex;flex-direction:column;gap:12px}.fl h2{font-size:19px;margin:0}.fl p{margin:0;color:var(--mu);font-size:14px;flex:1}
+.cmd{display:flex;align-items:center;gap:8px;background:var(--fill);border-radius:12px;padding:6px 6px 6px 12px;font:12px ui-monospace,"SF Mono",Menlo,monospace}
+.cmd span{flex:1;overflow-x:auto;white-space:nowrap}.cmd button{border:0;background:var(--card);border-radius:8px;padding:4px 10px;font:500 12px -apple-system,system-ui,sans-serif;color:var(--ac)}
+.arq{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;padding-top:44px}@media(max-width:860px){.arq{grid-template-columns:1fr}}
+svg text{fill:var(--tx);font:12px -apple-system,system-ui,sans-serif}svg .m{fill:var(--mu)}svg .t{font-weight:600}svg rect{fill:var(--fill);stroke:none}svg .h rect{fill:var(--ac)}svg .h text{fill:#fff}svg path{stroke:var(--mu);fill:none;stroke-width:1.3}
+dt{font-weight:600;margin-top:16px}dd{margin:2px 0 0;color:var(--mu)}dl{margin:0}
+
+.tabs button{padding:5px 16px}
+.appg{display:grid;grid-template-columns:300px 300px minmax(280px,1fr);gap:26px;justify-content:center;padding-top:34px;align-items:start}
+@media(max-width:1060px){.appg{grid-template-columns:300px 300px;}.appg .win{grid-column:1/-1}}
+@media(max-width:660px){.appg{grid-template-columns:1fr;justify-items:center}}
+.cap{text-align:center;margin:0 0 10px;font-size:13px;color:var(--mu)}.cap b{display:block;color:var(--tx);font-size:17px;letter-spacing:-.01em}
+.phone{width:300px;height:580px;border-radius:46px;border:9px solid #1d1d1f;background:var(--card);box-shadow:var(--sh),0 24px 50px rgba(0,0,0,.18);display:flex;flex-direction:column;overflow:hidden;position:relative}
+@media(prefers-color-scheme:dark){.phone{border-color:#3a3a3c}}
+.phone:before{content:"";position:absolute;top:8px;left:50%;width:82px;height:22px;margin-left:-41px;border-radius:99px;background:#1d1d1f;z-index:2}
+.scr{flex:1;overflow:auto;padding:44px 16px 14px;display:flex;flex-direction:column;gap:10px}
+.ph-h{font-size:22px;font-weight:700;letter-spacing:-.025em;line-height:1.15}.ph-h small{display:block;font-size:13px;font-weight:400;color:var(--mu);letter-spacing:0}
+.row{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}.row .n{flex:1}.row .n small{display:block;color:var(--mu);font-size:12px}
+.q{display:flex;align-items:center;gap:8px}.q button{width:26px;height:26px;border-radius:50%;border:0;background:var(--fill);font-size:16px;line-height:1;color:var(--ac)}.q span{min-width:14px;text-align:center}
+.ph-b{border:0;border-radius:14px;background:var(--ac);color:#fff;padding:13px;font-size:16px;font-weight:600;width:100%}.ph-b:disabled{opacity:.4}.ph-b.alt{background:var(--fill);color:var(--ac)}
+.ph-b:active{transform:scale(.98)}
+.tl{list-style:none;margin:0;padding:0}.tl li{display:flex;gap:10px;align-items:center;padding:5px 0;color:var(--mu);font-size:14px}
+.tl i{width:18px;height:18px;border-radius:50%;background:var(--fill);display:grid;place-items:center;font:700 11px system-ui;color:#fff;font-style:normal}
+.tl li.on{color:var(--tx)}.tl li.on i{background:var(--ok)}.tl li.bad i{background:var(--er)}
+.msg{background:var(--fill);border-radius:14px;padding:12px;font-size:14px}
+.cod{text-align:center;font:700 32px ui-monospace,"SF Mono",Menlo,monospace;letter-spacing:.14em;padding:10px;border-radius:14px;background:var(--fill)}
+.cod small{display:block;font:400 12px -apple-system,system-ui,sans-serif;letter-spacing:0;color:var(--mu)}
+.toast{position:absolute;left:14px;right:14px;bottom:14px;background:#1d1d1f;color:#fff;border-radius:14px;padding:10px 12px;font-size:13px;opacity:0;transform:translateY(8px);transition:opacity .25s,transform .25s;pointer-events:none}.toast.on{opacity:1;transform:none}
+.inp{width:100%;border:0;border-radius:12px;background:var(--fill);padding:12px;font:600 20px ui-monospace,Menlo,monospace;text-align:center;letter-spacing:.14em;color:var(--tx)}
+.win.tall .tape{height:468px}
+.hero.sm{padding:44px 0 10px}
+</style>
+</head>
+<body>
+<div class="bar">
+  <span class="logo">DiDistribuidores</span>
+  <div class="tabs" role="tablist"><button role="tab" aria-selected="true" data-t="app">App</button><button role="tab" aria-selected="false" data-t="demo">Pruebas</button><button role="tab" aria-selected="false" data-t="arq">Arquitectura</button></div>
+  <div class="pills"><span class="pill" id="pGw"><i></i>gateway</span><span class="pill" id="pCir"><i></i>circuito</span><span class="pill" id="pOut"><i></i>outbox</span></div>
+</div>
+<main>
+<section id="app">
+ <div class="appg">
+  <div><p class="cap"><b>Cliente</b>pide y sigue su entrega</p><div class="phone"><div class="scr" id="cli"></div><div class="toast" id="ct"></div></div></div>
+  <div><p class="cap"><b>Repartidor</b>acepta y entrega</p><div class="phone"><div class="scr" id="rep"></div><div class="toast" id="kt"></div></div></div>
+  <div class="win tall"><div class="top"><i></i><i></i><i></i><span>lo que ve el gateway</span></div><div class="tape"></div></div>
+ </div>
+</section>
+<section id="demo" hidden>
+ <div class="hero sm">
+  <h1>Pedidos que no se pierden.</h1>
+  <p class="sub">Ejecuta el flujo completo y después rompe algo: nadie paga dos veces.</p>
+  <div class="cta"><button class="go" id="bRun">Ejecutar demo</button><button class="link" id="bReset">Empezar de cero</button></div>
+  <p class="hint">También puedes presionar R</p>
+  <div class="panel order">
+   <div class="steps" id="steps"><div class="st">PENDIENTE_PAGO</div><div class="st">PAGADO</div><div class="st">ASIGNADO</div><div class="st">ENTREGADO</div></div>
+   <div class="kv" id="kv"><b>pedido</b><span>Aún no hay ninguno.</span></div>
+   <ul class="av" id="av"></ul>
+  </div>
+ </div>
+ <div class="cols">
+  <div class="panel"><h2>Qué hace la demo</h2><ol class="guion" id="guion"></ol></div>
+  <div class="win"><div class="top"><i></i><i></i><i></i><span>peticiones al gateway</span></div><div class="tape"></div>
+   <div class="tools"><button id="bBal">Balanceo, 10 consultas</button><button id="bCirc">Aceptar 6 veces seguidas</button></div><div class="chips" id="chips"></div></div>
+ </div>
+ <div class="sec"><h2>Ahora rómpelo.</h2><p>Corre el comando en la terminal y mira las insignias de arriba y la cinta.</p></div>
+ <div class="fl" id="fl"></div>
+</section>
+<section id="arq" hidden>
+ <div class="arq">
+  <div class="panel">
+   <h2>Cómo se comunican las partes</h2>
+   <svg viewBox="0 0 560 330" width="100%" role="img" aria-label="Diagrama de arquitectura">
+    <defs><marker id="f" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" style="fill:#8e8e93;stroke:none"/></marker></defs>
+    <g class="h"><rect x="150" y="20" width="110" height="40" rx="12"/></g>
+    <rect x="10" y="20" width="90" height="40" rx="12"/><rect x="30" y="130" width="120" height="50" rx="12"/><rect x="200" y="130" width="140" height="50" rx="12"/><rect x="390" y="130" width="140" height="50" rx="12"/>
+    <rect x="200" y="235" width="140" height="40" rx="12"/><rect x="390" y="235" width="140" height="40" rx="12"/><rect x="30" y="290" width="500" height="30" rx="12"/>
+    <g marker-end="url(#f)"><path d="M100 40 H150"/><path d="M185 60 L100 130"/><path d="M205 60 V130"/><path d="M240 60 L440 130"/><path d="M200 155 H150" stroke-dasharray="4"/><path d="M270 180 V235"/><path d="M340 255 H390"/><path d="M460 235 V180"/></g>
+    <text class="t" x="28" y="45">Cliente</text><text class="t" x="170" y="38">Traefik</text><text x="170" y="53" style="fill:#fff;opacity:.85">:8080 gateway</text>
+    <text class="t" x="55" y="152">Repartidores</text><text class="m" x="55" y="168">2 copias</text>
+    <text class="t" x="235" y="152">Núcleo</text><text class="m" x="212" y="168">pedidos y pagos</text>
+    <text class="t" x="410" y="152">Notificaciones</text><text class="m" x="410" y="168">consumidor y API</text>
+    <text class="t" x="245" y="252">Outbox</text><text class="m" x="215" y="267">misma transacción</text>
+    <text class="t" x="425" y="252">RabbitMQ</text><text class="m" x="405" y="267">cola durable y DLQ</text>
+    <text class="m" x="45" y="309">PostgreSQL: didistribuidores, repartidores_db, notificaciones_db</text>
+    <text class="m" x="158" y="148" style="font-size:10.5px">HTTP</text><text class="m" x="276" y="212" style="font-size:10.5px">evento</text>
+   </svg>
+   <p style="color:var(--mu);margin:10px 0 0">El núcleo consulta a repartidores por HTTP directo, con tiempo límite, un reintento seguro y circuit breaker. Los avisos viajan por mensajes.</p>
+  </div>
+  <div class="panel"><h2>Piezas clave</h2><dl>
+   <dt>Gateway</dt><dd>Traefik es la única entrada, en :8080. Enruta leyendo las etiquetas de los contenedores.</dd>
+   <dt>Directorio</dt><dd>El DNS de Docker Compose: los servicios se llaman por nombre.</dd>
+   <dt>Balanceo</dt><dd>Traefik reparte por turnos entre las 2 copias de repartidores y retira la que falla.</dd>
+   <dt>Mensajería</dt><dd>Outbox, RabbitMQ y un consumidor idempotente: el aviso llega una sola vez.</dd>
+   <dt>Resiliencia</dt><dd>Tiempo límite, reintento seguro y circuit breaker hacia repartidores.</dd>
+   <dt>Consistencia</dt><dd>La base decide: UNIQUE y UPDATE condicional. Ningún cobro doble.</dd></dl></div>
+ </div>
+</section>
+</main>
+<script>
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],ESTADOS=["PENDIENTE_PAGO","PAGADO","ASIGNADO","ENTREGADO"],sleep=ms=>new Promise(r=>setTimeout(r,ms)),$$$=n=>"$"+Number(n).toFixed(2);
+let B={},D={},C={cart:{}},K={},corriendo=false;
+$$(".tabs button").forEach(b=>b.onclick=()=>{$$(".tabs button").forEach(x=>x.setAttribute("aria-selected",x===b));["app","demo","arq"].forEach(t=>$("#"+t).hidden=b.dataset.t!==t);});
+const visible=id=>!$("#"+id).hidden;
+function log(t,c){$$(".tape").forEach(e=>{const d=document.createElement("div");d.className=c||"";d.textContent=t;e.appendChild(d);e.scrollTop=e.scrollHeight;});}
+async function api(m,ruta,body,cab={}){
+  const t0=performance.now();let r,datos=null;
+  try{r=await fetch(ruta,{method:m,headers:{"Content-Type":"application/json",...cab},body:body?JSON.stringify(body):undefined});}
+  catch(e){log(`${m} ${ruta}  sin conexión`,"s0");return{status:0,datos:null};}
+  try{datos=await r.json();}catch(e){}
+  const ms=Math.round(performance.now()-t0),inst=r.headers.get("X-Instancia");
+  if(!ruta.startsWith("/estado"))log(`${r.status}  ${m} ${ruta.slice(0,46)}  ${ms} ms${inst?"  ["+inst+"]":""}${datos&&datos.detail&&typeof datos.detail==="string"?"\n     "+datos.detail:""}`,"s"+String(r.status)[0]);
+  return{status:r.status,datos,ms,inst};
+}
+function toast(id,t){const e=$("#"+id);e.textContent=t;e.classList.add("on");clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove("on"),4200);}
+const err=r=>r.status===0?"Sin conexión con el sistema":(r.datos&&typeof r.datos.detail==="string"?r.datos.detail:"Error "+r.status);
+async function base(){
+  if(B.ok)return;
+  const R=(await api("GET","/api/restaurantes")).datos[0];B.R=R.id;B.zona=R.zona;B.rn=R.nombre;
+  B.menu=(await api("GET",`/api/restaurantes/${R.id}/platillos`)).datos;B.P=B.menu[0].id;
+  B.U=(await api("POST","/api/usuarios",{nombre:"Cliente demo",zona:R.zona})).datos.id;
+  const reps=(await api("GET",`/api/repartidores?zona=${R.zona}`)).datos||[];const rp=reps.find(x=>x.disponible)||reps[0];B.REP=rp.id;B.rnom=rp.nombre;B.ok=true;
+}
+const nuevo=(items,clave)=>api("POST","/api/pedidos",{usuario_id:B.U,restaurante_id:B.R,platillos:items},{"Idempotency-Key":clave});
+async function traer(id){const p=(await api("GET","/api/pedidos/"+id)).datos;if(!p||!p.estado)return{};const a=(await api("GET","/api/notificaciones/pedido/"+id)).datos||[];return{p,a};}
+/* ---------- App: cliente ---------- */
+const total=()=>B.menu.reduce((s,x)=>s+(C.cart[x.id]||0)*x.precio,0),items=()=>B.menu.filter(x=>C.cart[x.id]).map(x=>({platillo_id:x.id,cantidad:C.cart[x.id]}));
+const MSG={PENDIENTE_PAGO:"Confirma tu pago para que busquemos repartidor.",PAGADO:"Pago recibido. Buscando repartidor…",ASIGNADO:"Tu repartidor aceptó. Dale este código al recibir.",ENTREGADO:"Tu pedido fue entregado. ¡Buen provecho!"};
+function pintarC(r){
+  const e=$("#cli");
+  if(!B.ok){e.innerHTML='<div class="ph-h">Cargando…</div>';return;}
+  if(!C.id){
+    e.innerHTML=`<div class="ph-h">${B.rn}<small>Entrega a domicilio</small></div>`+B.menu.map(x=>`<div class="row"><div class="n">${x.nombre}<small>${$$$(x.precio)}</small></div><div class="q"><button data-i="${x.id}" data-d="-1" aria-label="menos">−</button><span>${C.cart[x.id]||0}</span><button data-i="${x.id}" data-d="1" aria-label="más">+</button></div></div>`).join("")+`<div style="flex:1"></div><button class="ph-b" id="cPedir" ${total()?"":"disabled"}>Pedir ${total()?$$$(total()):""}</button>`;return;
+  }
+  const {p,a}=r||{};if(!p){return;}
+  const i=ESTADOS.indexOf(p.estado),cx=p.estado==="CANCELADO";
+  e.innerHTML=`<div class="ph-h">Tu pedido<small>${B.rn} · ${$$$(p.total)}</small></div><ul class="tl">${ESTADOS.map((s,k)=>`<li class="${cx?"":k<=i?"on":""}"><i>${!cx&&k<=i?"✓":""}</i>${["Pedido creado","Pago recibido","Repartidor asignado","Entregado"][k]}</li>`).join("")}${cx?'<li class="bad"><i>!</i>Cancelado ('+p.motivo_cancelacion+')</li>':""}</ul>
+  <div class="msg">${cx?"Cancelamos tu pedido. Si ya habías pagado, te lo reembolsamos.":MSG[p.estado]}</div>
+  ${p.estado==="ASIGNADO"?`<div class="cod"><small>Código de entrega</small>${p.codigo_entrega}</div>`:""}
+  ${p.estado==="PENDIENTE_PAGO"?`<button class="ph-b" id="cPagar">Pagar ${$$$(p.total)}</button>`:""}
+  ${(a||[]).length?`<ul class="av">${a.map(x=>`<li>${x.mensaje}<small>versión ${x.version_pedido}</small></li>`).join("")}</ul>`:""}
+  <div style="flex:1"></div>${p.estado==="ENTREGADO"||cx?'<button class="ph-b alt" id="cNuevo">Nuevo pedido</button>':""}`;
+}
+$("#cli").onclick=async ev=>{
+  const b=ev.target.closest("button");if(!b)return;
+  if(b.dataset.i){C.cart[b.dataset.i]=Math.max(0,(C.cart[b.dataset.i]||0)+Number(b.dataset.d));return pintarC();}
+  if(b.id==="cPedir"){b.disabled=true;const r=await nuevo(items(),"app-"+Date.now());if(r.status===201||r.status===200){C.id=r.datos.id;pintarC(await traer(C.id));}else{toast("ct",err(r));b.disabled=false;}}
+  if(b.id==="cPagar"){const r=await api("POST",`/api/pedidos/${C.id}/pago`);if(r.status!==200)toast("ct",err(r));pintarC(await traer(C.id));}
+  if(b.id==="cNuevo"){C={cart:{}};pintarC();}
+};
+/* ---------- App: repartidor ---------- */
+async function pintarK(){
+  const e=$("#rep");if(!B.ok)return;
+  if(K.id){
+    e.innerHTML=`<div class="ph-h">Entrega en curso<small>${B.rnom} · pedido ${K.id.slice(0,8)}</small></div><div class="msg">Pide el código al cliente y confírmalo al entregar.</div><input class="inp" id="kCod" inputmode="numeric" maxlength="6" placeholder="000000" aria-label="Código de entrega"><button class="ph-b" id="kEnt">Confirmar entrega</button>`;return;
+  }
+  const r=await api("GET",`/api/pedidos/disponibles?repartidor_id=${B.REP}`);
+  if(K.id)return;
+  if(r.status!==200){e.innerHTML=`<div class="ph-h">${B.rnom}<small>Zona ${B.zona}</small></div><div class="msg">No puedo consultar pedidos ahora. Reintentando…</div>`;toast("kt",err(r));return;}
+  const l=r.datos||[];
+  e.innerHTML=`<div class="ph-h">${B.rnom}<small>Zona ${B.zona} · ${l.length} disponible${l.length===1?"":"s"}</small></div>`+(l.length?l.map(x=>`<div class="row"><div class="n">Pedido ${x.id.slice(0,8)}<small>${$$$(x.total)}</small></div><button class="ph-b" style="width:auto;padding:8px 16px;font-size:14px" data-a="${x.id}">Aceptar</button></div>`).join(""):'<div class="msg">Sin pedidos por ahora. Se actualiza solo.</div>');
+}
+$("#rep").onclick=async ev=>{
+  const b=ev.target.closest("button");if(!b)return;
+  if(b.dataset.a){b.disabled=true;const r=await api("POST",`/api/pedidos/${b.dataset.a}/aceptar`,{repartidor_id:B.REP});if(r.status===200){K.id=b.dataset.a;pintarK();}else{toast("kt",err(r));pintarK();}}
+  if(b.id==="kEnt"){const r=await api("POST",`/api/pedidos/${K.id}/entrega`,{codigo:$("#kCod").value.trim()});if(r.status===200){toast("kt","Entrega confirmada");K={};pintarK();}else toast("kt",r.status===422?"Código incorrecto":err(r));}
+};
+/* ---------- Pruebas ---------- */
+async function pintarD(){
+  const {p,a}=await traer(D.id);if(!p)return 0;D.cod=p.codigo_entrega;const i=ESTADOS.indexOf(p.estado);
+  $("#steps").innerHTML=ESTADOS.map((e,k)=>`<div class="st ${p.estado==="CANCELADO"?"bad":k<=i?"on":""}">${e}</div>`).join("")+(p.estado==="CANCELADO"?`<div class="st bad">CANCELADO (${p.motivo_cancelacion})</div>`:"");
+  $("#kv").innerHTML=`<b>pedido</b><span class="mono">${p.id}</span><b>total</b><span>${$$$(p.total)}</span><b>versión</b><span>${p.version}</span><b>repartidor</b><span class="mono">${p.repartidor_id||"sin asignar"}</span><b>clave</b><span class="mono">${D.clave}</span>`;
+  $("#av").innerHTML=a.map(x=>`<li>${x.mensaje}<small>versión ${x.version_pedido}, ${x.tipo}</small></li>`).join("");return a.length;
+}
+const it=n=>[{platillo_id:B.P,cantidad:n}];
+const PASOS=[
+ ["Crear el pedido",async()=>{await base();D.clave="demo-"+Date.now();const r=await nuevo(it(1),D.clave);if(r.datos&&r.datos.id)D.id=r.datos.id;await pintarD();return r.status===201;}],
+ ["Repetir la petición con la misma clave: mismo pedido",async()=>{const r=await nuevo(it(1),D.clave);return r.status===200&&r.datos.id===D.id;}],
+ ["Reusar la clave con otro pedido: se rechaza",async()=>(await nuevo(it(3),D.clave)).status===422],
+ ["Pagar, con un solo cobro",async()=>(await api("POST",`/api/pedidos/${D.id}/pago`)).status===200],
+ ["Un repartidor acepta (consulta a repartidores)",async()=>(await api("POST",`/api/pedidos/${D.id}/aceptar`,{repartidor_id:B.REP})).status===200],
+ ["Entregar con el código",async()=>{await pintarD();return (await api("POST",`/api/pedidos/${D.id}/entrega`,{codigo:D.cod})).status===200;}],
+ ["Llegan los tres avisos por RabbitMQ",async()=>{for(let i=0;i<6;i++){await sleep(700);if((await pintarD())>=3)return true;}return false;}]
+];
+function pintarGuion(est){$("#guion").innerHTML=PASOS.map((p,i)=>{const e=est[i]||{};return `<li class="${e.c||""}"><span class="m">${e.c==="ok"?"✓":e.c==="er"?"!":""}</span>${p[0]}<span class="t">${e.t||""}</span></li>`;}).join("");}
+async function correr(){
+  if(corriendo)return;corriendo=true;$("#bRun").disabled=true;D={};$("#av").innerHTML="";$("#kv").innerHTML="<b>pedido</b><span>Creando…</span>";
+  const est=[];pintarGuion(est);
+  for(let i=0;i<PASOS.length;i++){est[i]={c:"run"};pintarGuion(est);const t0=performance.now();let ok=false;
+    try{ok=await PASOS[i][1]();}catch(e){log("error: "+e.message,"s5");}
+    est[i]={c:ok?"ok":"er",t:Math.round(performance.now()-t0)+" ms"};pintarGuion(est);if(!ok)break;}
+  corriendo=false;$("#bRun").disabled=false;
+}
+$("#bRun").onclick=correr;
+$("#bReset").onclick=()=>{D={};$$(".tape").forEach(t=>t.innerHTML="");$("#chips").innerHTML="";$("#av").innerHTML="";$("#kv").innerHTML="<b>pedido</b><span>Aún no hay ninguno.</span>";$$("#steps .st").forEach(x=>x.className="st");pintarGuion([]);};
+addEventListener("keydown",e=>{if((e.key==="r"||e.key==="R")&&!e.metaKey&&!e.ctrlKey&&visible("demo"))correr();});
+$("#bBal").onclick=async()=>{await base();const c={};for(let i=0;i<10;i++){const r=await api("GET",`/api/repartidores?zona=${B.zona}`);const k=r.inst||"sin respuesta";c[k]=(c[k]||0)+1;}$("#chips").innerHTML=Object.entries(c).map(([k,v])=>`<span class="chip">${k}: ${v}</span>`).join("");};
+$("#bCirc").onclick=async()=>{await base();D={clave:"circ-"+Date.now()};const r=await nuevo(it(1),D.clave);D.id=r.datos.id;await api("POST",`/api/pedidos/${D.id}/pago`);for(let i=0;i<6;i++)await api("POST",`/api/pedidos/${D.id}/aceptar`,{repartidor_id:B.REP});pintarD();};
+const FALLAS=[
+ ["Cae repartidores","docker compose stop repartidores","El repartidor deja de ver pedidos y aceptar da 503. En Pruebas, «Aceptar 6 veces» abre el circuito.","docker compose start repartidores"],
+ ["Cae notificaciones","docker compose stop notificaciones","El pedido sigue hasta entregarse; los avisos esperan en la cola y llegan una vez al volver.","docker compose start notificaciones"],
+ ["Cae RabbitMQ","docker compose stop rabbitmq","El outbox acumula eventos (insignia ámbar) y se vacía solo cuando el broker regresa.","docker compose start rabbitmq"],
+ ["Se reinicia PostgreSQL","docker compose restart db","Hay errores unos segundos y todo se recupera sin reiniciar ningún servicio.",""]];
+$("#fl").innerHTML=FALLAS.map(f=>`<div class="panel"><h2>${f[0]}</h2><div class="cmd"><span>${f[1]}</span><button data-c="${f[1]}">Copiar</button></div><p>${f[2]}</p>${f[3]?`<div class="cmd"><span>${f[3]}</span><button data-c="${f[3]}">Copiar</button></div>`:""}</div>`).join("");
+$$("[data-c]").forEach(b=>b.onclick=()=>{navigator.clipboard.writeText(b.dataset.c);b.textContent="Copiado";setTimeout(()=>b.textContent="Copiar",1200);});
+async function vigilar(){
+  const r=await api("GET","/estado"),g=$("#pGw"),c=$("#pCir"),o=$("#pOut");
+  if(r.status!==200){g.className="pill er";g.lastChild.textContent="gateway sin respuesta";return;}
+  g.className="pill ok";g.lastChild.textContent="gateway";
+  const k=r.datos.repartidores;c.className="pill "+(k.circuito==="CERRADO"?"ok":k.circuito==="ABIERTO"?"er":"wr");c.lastChild.textContent="circuito "+k.circuito.toLowerCase();
+  const n=r.datos.outbox_pendientes;o.className="pill "+(n?"wr":"ok");o.lastChild.textContent=n+" eventos pendientes";
+}
+(async()=>{pintarGuion([]);pintarC();vigilar();try{await base();}catch(e){log("No se pudo preparar la demo: "+e.message,"s5");}pintarC();pintarK();})();
+setInterval(vigilar,2000);
+setInterval(async()=>{if(!visible("app")||!B.ok)return;if(C.id)pintarC(await traer(C.id));},2000);
+setInterval(()=>{if(visible("app")&&B.ok&&!K.id)pintarK();},3000);
+</script>
+</body>
+</html>

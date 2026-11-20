@@ -1,3 +1,5 @@
+import hashlib
+import json
 import secrets
 
 from app import config, db
@@ -10,8 +12,31 @@ from app.modulos.usuarios import servicio as usuarios
 
 
 def _completo(conn, pedido):
-    """El pedido junto con sus platillos."""
-    return {**pedido, "platillos": repositorio.listar_platillos(conn, pedido["id"])}
+    """El pedido junto con sus platillos (sin la huella interna, que no es para el cliente)."""
+    visible = {k: v for k, v in pedido.items() if k != "huella_peticion"}
+    return {**visible, "platillos": repositorio.listar_platillos(conn, pedido["id"])}
+
+
+def _huella(usuario_id, restaurante_id, cantidades):
+    """Resumen SHA-256 de lo que pidió la petición, en forma canónica: los platillos van ordenados
+    y los repetidos ya vienen sumados, así que pedir lo mismo en otro orden da la misma huella."""
+    canonico = {
+        "usuario": str(usuario_id),
+        "restaurante": str(restaurante_id),
+        "platillos": sorted([str(pid), cant] for pid, cant in cantidades.items()),
+    }
+    texto = json.dumps(canonico, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(texto.encode("utf-8")).hexdigest()
+
+
+def _verificar_huella(existente, huella):
+    """Misma clave y misma petición: es un reintento legítimo. Misma clave y otra petición:
+    la clave se reutilizó por error, se rechaza. Pedidos sin huella (anteriores a la columna) se aceptan."""
+    guardada = existente.get("huella_peticion")
+    if guardada is not None and guardada != huella:
+        raise Invalido(
+            "Esa Idempotency-Key ya se usó con un pedido distinto. Usa una clave nueva para un pedido nuevo"
+        )
 
 
 def _estado_actual(conn, pedido_id):
@@ -27,10 +52,17 @@ def crear_pedido(clave, usuario_id, restaurante_id, items):
     items: lista de (platillo_id, cantidad).
     Devuelve (pedido, creado). creado es False si la clave ya se había usado.
     """
-    # 1. ¿Ya existe un pedido con esta clave? Si sí, es un reintento: se devuelve el mismo.
+    cantidades = {}  # si un platillo viene repetido, se suman las cantidades
+    for platillo_id, cantidad in items:
+        cantidades[platillo_id] = cantidades.get(platillo_id, 0) + cantidad
+    huella = _huella(usuario_id, restaurante_id, cantidades)
+
+    # 1. ¿Ya existe un pedido con esta clave? Si sí, es un reintento: se devuelve el mismo,
+    #    siempre que la petición sea la misma (si no, 422).
     with db.conexion() as conn:
         existente = repositorio.buscar_por_clave(conn, usuario_id, clave)
         if existente is not None:
+            _verificar_huella(existente, huella)
             return _completo(conn, existente), False
 
     # 2. Validar con los otros módulos (solo a través de sus servicios)
@@ -39,10 +71,6 @@ def crear_pedido(clave, usuario_id, restaurante_id, items):
     restaurante = restaurantes.obtener_restaurante(restaurante_id)
     if restaurante is None:
         raise NoEncontrado("Restaurante no encontrado")
-
-    cantidades = {}  # si un platillo viene repetido, se suman las cantidades
-    for platillo_id, cantidad in items:
-        cantidades[platillo_id] = cantidades.get(platillo_id, 0) + cantidad
 
     platillos = restaurantes.obtener_platillos(restaurante_id, list(cantidades))
     precios = {p["id"]: p["precio"] for p in platillos}
@@ -56,11 +84,12 @@ def crear_pedido(clave, usuario_id, restaurante_id, items):
     # 3. Insertar. Todo en una sola transacción: el pedido y sus platillos entran juntos o no entran.
     with db.conexion() as conn:
         pedido = repositorio.insertar_si_no_existe(
-            conn, usuario_id, restaurante_id, restaurante["zona"], total, clave, codigo_entrega
+            conn, usuario_id, restaurante_id, restaurante["zona"], total, clave, codigo_entrega, huella
         )
         if pedido is None:
             # Otra petición con la misma clave se nos adelantó: devolvemos su pedido.
             existente = repositorio.buscar_por_clave(conn, usuario_id, clave)
+            _verificar_huella(existente, huella)
             return _completo(conn, existente), False
 
         filas = [(pid, cant, precios[pid]) for pid, cant in cantidades.items()]
@@ -98,7 +127,11 @@ def listar_disponibles(repartidor_id):
     if repartidor is None:
         raise NoEncontrado("Repartidor no encontrado")
     with db.conexion() as conn:
-        return repositorio.listar_pagados_por_zona(conn, repartidor["zona"])
+        pedidos = repositorio.listar_pagados_por_zona(conn, repartidor["zona"])
+    # Al repartidor no se le muestra el código de entrega (se lo da el cliente al recibir;
+    # si lo viera aquí podría confirmar la entrega sin entregar) ni la huella, que es interna.
+    ocultos = ("codigo_entrega", "huella_peticion")
+    return [{k: v for k, v in p.items() if k not in ocultos} for p in pedidos]
 
 
 def aceptar_pedido(pedido_id, repartidor_id):

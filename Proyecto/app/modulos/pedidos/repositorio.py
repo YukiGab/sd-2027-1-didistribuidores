@@ -1,21 +1,21 @@
 COLUMNAS = """id, usuario_id, restaurante_id, zona, estado, motivo_cancelacion, total,
               clave_idempotencia, repartidor_id, codigo_entrega, version,
-              creado_en, actualizado_en, retraso_avisado"""
+              creado_en, actualizado_en, retraso_avisado, huella_peticion"""
 
 
-def insertar_si_no_existe(conn, usuario_id, restaurante_id, zona, total, clave, codigo):
+def insertar_si_no_existe(conn, usuario_id, restaurante_id, zona, total, clave, codigo, huella):
     """Inserta el pedido. Si ya existe uno con la misma (usuario, clave), no inserta
     nada y devuelve None. La restricción UNIQUE de la base es lo que lo decide, de forma
     atómica: si dos peticiones llegan a la vez, la segunda espera a que la primera termine."""
     return conn.execute(
         f"""
         INSERT INTO pedidos.pedidos
-            (usuario_id, restaurante_id, zona, total, clave_idempotencia, codigo_entrega)
-        VALUES (%s, %s, %s, %s, %s, %s)
+            (usuario_id, restaurante_id, zona, total, clave_idempotencia, codigo_entrega, huella_peticion)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (usuario_id, clave_idempotencia) DO NOTHING
         RETURNING {COLUMNAS}
         """,
-        (usuario_id, restaurante_id, zona, total, clave, codigo),
+        (usuario_id, restaurante_id, zona, total, clave, codigo, huella),
     ).fetchone()
 
 

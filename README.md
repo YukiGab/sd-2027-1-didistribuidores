@@ -25,7 +25,7 @@ Materia: Sistemas Distribuidos 2027-1, Grupo 2, FI-UNAM.
 ## Arquitectura en una vista
 
 ```
-                clientes (curl, Swagger, aplicaciones)
+        clientes: interfaz.py, panel web (/panel/), Swagger (/docs), curl
                               │  HTTP, puerto 8080
                               ▼
                      Traefik (gateway)
@@ -34,8 +34,8 @@ Materia: Sistemas Distribuidos 2027-1, Grupo 2, FI-UNAM.
      Núcleo            Repartidores            Notificaciones
  (usuarios, restau-   (2 copias, sin estado)   (consumidor + API)
   rantes, pedidos,           ▲                        ▲
-  pagos, outbox)             │ HTTP directo,          │ eventos
-        │                    │ con tiempo límite      │
+  pagos, outbox,             │ HTTP directo, tiempo   │ eventos
+  circuit breaker)           │ límite y breaker       │
         └────────────────────┘                  RabbitMQ (cola persistente)
         │  outbox → publicador ───────────────────────┘
         ▼
@@ -50,7 +50,7 @@ Materia: Sistemas Distribuidos 2027-1, Grupo 2, FI-UNAM.
 
 ## ¿Cómo se levanta?
 
-Requisitos: Docker y Docker Compose.
+Requisitos: Docker y Docker Compose (y Python 3.9 o más nuevo para la aplicación de escritorio).
 
 ```bash
 cd Proyecto
@@ -71,6 +71,17 @@ docker compose down -v     # apaga y borra los datos (se vuelven a cargar los de
 > Hay que usar `docker compose down -v` al cambiar de etapa o de rama: los scripts de la carpeta
 > `db/` solo se ejecutan cuando el volumen está vacío.
 
+## Interfaces
+
+| Interfaz | Cómo se abre | Para qué |
+|---|---|---|
+| Aplicación de escritorio | `python interfaz/interfaz.py` (desde `Proyecto/`) | Pedir y pagar como cliente, aceptar y entregar como repartidor, y ver el estado del sistema. Solo usa la biblioteca estándar de Python |
+| Panel web | <http://localhost:8080/panel/> | La demostración para la presentación: cliente y repartidor, pruebas y arquitectura |
+| Swagger | <http://localhost:8080/docs> | Probar cada endpoint a mano |
+
+Las dos interfaces solo llaman a la API por el gateway: muestran, nunca deciden. El uso paso a paso,
+con capturas, está en el [manual de usuario](documentacion/manual-de-usuario/manual-de-usuario.pdf).
+
 ## Endpoints principales
 
 Todos los endpoints se consumen por el gateway (`http://localhost:8080`); él decide qué servicio contesta.
@@ -78,6 +89,7 @@ Todos los endpoints se consumen por el gateway (`http://localhost:8080`); él de
 | Método y ruta | Qué hace | Servicio |
 |---|---|---|
 | `GET /salud` | Comprueba que la app y la base responden | Núcleo |
+| `GET /estado` | Estado del circuito hacia repartidores y eventos pendientes de publicar | Núcleo |
 | `POST /api/usuarios`, `GET /api/usuarios/{id}` | Crear y consultar un usuario | Núcleo |
 | `GET /api/restaurantes`, `GET /api/restaurantes/{id}/platillos` | Restaurantes y su menú | Núcleo |
 | `POST /api/pedidos` (header `Idempotency-Key`) | Crear un pedido de forma idempotente | Núcleo |
@@ -105,17 +117,25 @@ tiempo, o nadie toma un pedido pagado, el pedido se cancela y, si había cobro, 
 ├── docs/
 │   ├── PRD.md                 requisitos, alcance y decisiones de arquitectura
 │   ├── eventos.md             contrato de los eventos entre servicios
-│   ├── reporte_etapa1.md      reporte técnico detallado de la etapa 1
-│   └── bitacoras-por-etapa/   bitácoras de pruebas de las etapas 1, 2 y 3
+│   └── reporte-final.pdf      reporte final del proyecto (copia del de documentacion/)
+├── documentacion/
+│   ├── bitacora-1 … bitacora-4/   bitácora de pruebas de cada etapa (.tex, .pdf y capturas)
+│   ├── pruebas/               plan y resultados de todas las pruebas (PDF y Word) y la regresión
+│   ├── manual-de-usuario/     cómo levantar y usar el sistema y sus interfaces
+│   ├── documentacion-final/   reporte final (.tex y .pdf)
+│   └── estilo/                estilo LaTeX común a todos los documentos
 └── Proyecto/
     ├── docker-compose.yml     Traefik, núcleo, repartidores (2 copias), notificaciones, RabbitMQ y PostgreSQL
     ├── Dockerfile
     ├── requirements.txt
-    ├── db/                    esquema, datos de prueba, outbox y las bases de notificaciones y repartidores
+    ├── db/                    esquema, datos de prueba, outbox, bases de notificaciones y repartidores, huella
     ├── app/                   el núcleo
     │   ├── main.py, config.py, db.py, errores.py
-    │   ├── clientes/          cliente HTTP de repartidores (tiempo límite)
-    │   └── modulos/           usuarios, restaurantes, pedidos y pagos
+    │   ├── resiliencia.py     circuit breaker
+    │   ├── clientes/          cliente HTTP de repartidores (tiempo límite, reintento y breaker)
+    │   ├── modulos/           usuarios, restaurantes, pedidos y pagos
+    │   └── panel/             panel web de demostración
+    ├── interfaz/interfaz.py   aplicación de escritorio
     ├── repartidores/          servicio de repartidores (API y base propia, dos copias)
     └── notificaciones/        servicio de notificaciones (consumidor de RabbitMQ y API)
 ```
@@ -138,7 +158,10 @@ Variables de entorno de la aplicación (se definen en `docker-compose.yml`):
 | `RABBITMQ_URL` | `amqp://sd:sd@rabbitmq:5672/` | Dirección de RabbitMQ |
 | `REPARTIDORES_URL` | `http://repartidores:8000` | Dirección del servicio de repartidores para el núcleo |
 | `REPARTIDORES_TIMEOUT_SEG` | 3 | Tiempo límite para recibir la respuesta de cada llamada del núcleo a repartidores |
-| `REPARTIDORES_CONNECT_TIMEOUT_SEG` | 1 (valor por defecto) | Tiempo límite para conectar con repartidores |
+| `REPARTIDORES_CONNECT_TIMEOUT_SEG` | 1 (valor por defecto) | Tiempo límite para resolver el nombre y conectar con repartidores |
+| `BREAKER_FALLOS` | 3 | Fallos seguidos que abren el circuito hacia repartidores |
+| `BREAKER_PAUSA_SEG` | 10 | Segundos que espera abierto antes de dejar pasar una llamada de prueba |
+| `REPARTIDORES_REINTENTOS` | 1 | Reintentos por llamada a repartidores (solo cuando es seguro) |
 
 Variable solo para pruebas, en el servicio de repartidores: `LATENCIA_MS` (0 por defecto) retrasa sus
 respuestas para comprobar el tiempo límite, por ejemplo `LATENCIA_MS=5000 docker compose up -d repartidores`.
@@ -193,13 +216,34 @@ un gateway (Traefik) que es la única entrada al sistema.
   con la copia que contestó.
 - **El núcleo no se cae con repartidores.** Se pueden crear y pagar pedidos aunque repartidores esté
   caído. La consulta del núcleo es directa (por el DNS de Docker, sin pasar por el gateway) y tiene un
-  tiempo límite de 3 segundos; si no responde, el núcleo contesta 503 y no cambia nada.
+  tiempo límite; si no responde, el núcleo contesta 503 y no cambia nada.
 - **Quién decide.** Repartidores informa (quién es, su zona y si está disponible); pedidos decide
   quién gana el pedido con un `UPDATE` condicional en su propia base.
 - **El cliente se entera del retraso.** Si un pedido pagado tarda demasiado en tener repartidor,
   recibe el aviso `pedido.retrasado` (una sola vez); si vence el tiempo, el pedido se cancela y se reembolsa.
 
 Con Docker 29 o superior, Traefik debe ser la versión 3.6.1 o más nueva; el compose fija `traefik:v3.6`.
+
+## Etapa 4: resiliencia
+
+La última etapa hace que el sistema aguante fallas sin perder información.
+
+- **Circuit breaker.** Si el servicio de repartidores falla varias veces seguidas, el núcleo deja de
+  llamarlo y responde 503 al instante en lugar de esperar su tiempo límite en cada intento. Pasado un
+  rato deja pasar una llamada de prueba y, si sale bien, vuelve a la normalidad.
+- **Reintentos seguros.** Un solo reintento, solo cuando la petición no llegó a enviarse o el
+  servicio respondió 502, 503 o 504; nunca después de un tiempo de espera agotado ni cuando el nombre
+  del servicio no se resuelve.
+- **La resolución del nombre también tiene tiempo límite.** En Docker Desktop para Windows, resolver el
+  nombre de un servicio detenido tardaba unos 4 s (8 s con el reintento); ahora tiene el mismo límite de
+  1 s que la conexión.
+- **Deduplicación completa.** Si una `Idempotency-Key` se reutiliza con un pedido distinto, se
+  rechaza con 422 en lugar de devolver el pedido original sin avisar.
+- **Estado operativo.** `GET /estado` muestra el estado del circuito y cuántos eventos esperan
+  publicarse.
+- **Recuperación automática.** Los servicios se reconectan solos si PostgreSQL se reinicia.
+
+Todo se comprobó contra Docker real; las salidas están en la bitácora 4.
 
 ## Plan de ramas
 
@@ -211,7 +255,7 @@ El sistema empieza como un monolito y se parte por etapas, cada una en su rama.
 | `01-monolito` | Una aplicación y una base. Flujo completo de pedidos con idempotencia | Listo |
 | `02-separacion` | `notificaciones` como proceso aparte, con cola persistente. Los pedidos siguen funcionando con ese proceso apagado | Listo |
 | `03-separacion` | `repartidores` como servicio propio con gateway y dos copias; gana el primer repartidor que acepta | Listo |
-| `04-resiliencia` | Reintentos, deduplicación, timeout con reembolso, circuit breaker y pruebas de caídas | Pendiente |
+| `04-resiliencia` | Reintentos, deduplicación, timeout con reembolso, circuit breaker y pruebas de caídas | Listo |
 
 ## Estado actual
 
@@ -224,10 +268,16 @@ El sistema empieza como un monolito y se parte por etapas, cada una en su rama.
   propia y recibe los eventos por RabbitMQ.
 - **Etapa 3 (`03-separacion`):** terminada. `repartidores` corre como servicio aparte con base
   propia y dos copias detrás de un gateway. El núcleo lo consulta por HTTP con tiempo límite.
-- **Siguiente:** etapa 4, circuit breaker, reintentos y pruebas sistemáticas de caídas.
+- **Etapa 4 (`04-resiliencia`):** terminada. El núcleo tiene circuit breaker y reintentos seguros hacia
+  repartidores, detecta claves de idempotencia reutilizadas y se recupera solo si PostgreSQL se reinicia.
+- **El proyecto está completo:** las cuatro etapas están terminadas, con su interfaz y su documentación.
 
 ## Documentación
 
+- [Reporte final](docs/reporte-final.pdf): problema, diagramas, decisiones, manejo de fallas, cómo
+  levantarlo, qué falta y quién hizo qué.
 - [PRD](docs/PRD.md): problema, alcance, "dónde vive cada pieza" y decisiones de arquitectura.
 - [Contrato de eventos](docs/eventos.md): formato de los eventos entre `pedidos` y `notificaciones`.
-- [Bitácoras por etapa]: pruebas con evidencia de las etapas 1, 2 y 3.
+- [Bitácoras por etapa](documentacion/): pruebas con evidencia de las etapas 1 a 4.
+- [Pruebas del proyecto](documentacion/pruebas/): todas las pruebas, en PDF y en Word.
+- [Manual de usuario](documentacion/manual-de-usuario/manual-de-usuario.pdf).

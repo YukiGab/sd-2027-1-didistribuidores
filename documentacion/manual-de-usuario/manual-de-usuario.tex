@@ -1,0 +1,241 @@
+\documentclass[11pt]{article}
+\makeatletter\def\input@path{{../estilo/}}\makeatother
+\usepackage{didistribuidores}
+\renewcommand{\documentocorto}{Manual de usuario}
+
+\begin{document}
+\portada{Manual de usuario}{Cómo instalar, levantar y usar DiDistribuidores}%
+  {Para quien quiera correr el sistema, pedir comida como cliente o entregarla como repartidor}%
+  {Versión final (etapas 1 a 4)}{18 de noviembre de 2026}
+
+\tableofcontents
+\newpage
+
+\section{Qué es DiDistribuidores}
+
+Un sistema para pedir comida a domicilio. Un \textbf{cliente} elige platillos de un restaurante, hace su
+pedido, lo paga (el pago es simulado) y sigue su entrega. Un \textbf{repartidor} de la misma zona acepta el
+pedido y lo entrega con un código que le da el cliente. El sistema avisa al cliente de cada cambio.
+
+Su prioridad es que \textbf{nada se pierda ni se cobre dos veces}: si la red repite una petición, el
+pedido no se duplica; si un servicio se cae, los pedidos siguen y los avisos llegan después.
+
+\subsection{Las tres formas de usarlo}
+\begin{tabularx}{\linewidth}{@{}l X l@{}}
+\toprule
+\textsf{\textbf{Forma}} & \textsf{\textbf{Para qué}} & \textsf{\textbf{Dónde}} \\
+\midrule
+Aplicación de escritorio & Usar el sistema como cliente y repartidor, y ver su estado & \cod{Proyecto/interfaz/interfaz.py} \\
+Panel web & La demostración para la presentación & \url{http://localhost:8080/panel/} \\
+API (Swagger o \cod{curl}) & Probar cada operación a mano & \url{http://localhost:8080/docs} \\
+\bottomrule
+\end{tabularx}
+
+\section{Requisitos}
+
+\begin{itemize}
+  \item \textbf{Docker Desktop} (Windows o macOS) o Docker Engine con Compose v2 (Linux). Si usas Docker
+        29 o más nuevo, el proyecto ya fija la versión de Traefik que funciona con él.
+  \item \textbf{Python 3.9 o más nuevo} solo para la aplicación de escritorio. No necesita instalar
+        paquetes: usa la biblioteca estándar (Tkinter viene con Python en Windows y macOS; en Linux puede
+        ser necesario \cod{sudo apt install python3-tk}).
+  \item Puertos libres: \textbf{8080} (el sistema), 8081 (panel de Traefik), 15672 (consola de RabbitMQ)
+        y 5432 (PostgreSQL).
+\end{itemize}
+
+\section{Levantar el sistema}
+
+\begin{enumerate}
+  \item Abre una terminal en la carpeta \cod{Proyecto} del repositorio.
+  \item Levanta todo:
+\begin{comando}
+docker compose up --build -d
+\end{comando}
+        La primera vez descarga las imágenes y tarda unos minutos.
+  \item Comprueba que está listo (RabbitMQ tarda de 20 a 40 segundos en estar sano):
+\begin{comando}
+docker compose ps
+curl http://localhost:8080/salud
+\end{comando}
+        Debes ver siete contenedores (\cod{db} y \cod{rabbitmq} con \cod{(healthy)}) y la respuesta
+        \cod{\{"estado":"ok"\}}. En Windows también puedes abrir \url{http://localhost:8080/salud} en el
+        navegador.
+\end{enumerate}
+
+\subsection{Apagar, reiniciar y empezar de cero}
+\begin{tabularx}{\linewidth}{@{}l X@{}}
+\toprule
+\textsf{\textbf{Comando}} & \textsf{\textbf{Qué hace}} \\
+\midrule
+\cod{docker compose down} & Apaga el sistema y \textbf{conserva} los datos. \\
+\cod{docker compose up -d} & Lo vuelve a encender con los mismos datos. \\
+\cod{docker compose down -v} & Apaga y \textbf{borra} los datos. Al volver a levantarlo se cargan los datos de prueba: 3 restaurantes con su menú y 5 repartidores. \\
+\bottomrule
+\end{tabularx}
+
+\begin{nota}[Datos de prueba]
+Restaurantes: Tacos El Güero (zona 1), Pizzería Don Luigi (zona 2) y Fonda La Abuela (zona 3).
+Repartidores: Ana Ruiz y Luis Pérez (zona 1), Diego Vega y Marta Soto (zona 2) y Sofía Mena (zona 3).
+Un repartidor solo ve los pedidos de su zona.
+\end{nota}
+
+\section{La aplicación de escritorio}
+
+\subsection{Abrirla}
+Con el sistema levantado, desde la carpeta \cod{Proyecto}:
+\begin{comando}
+python interfaz/interfaz.py
+\end{comando}
+Si el sistema corre en otra máquina: \cod{python interfaz/interfaz.py --url http://otra-maquina:8080}.
+
+Arriba a la derecha hay tres \textbf{insignias} que se actualizan cada 2 segundos:
+
+\begin{tabularx}{\linewidth}{@{}l X@{}}
+\toprule
+\textsf{\textbf{Insignia}} & \textsf{\textbf{Qué significa}} \\
+\midrule
+gateway & Verde si el sistema responde por \cod{localhost:8080}; roja si no. \\
+circuito & Verde (\cod{CERRADO}): repartidores responde normal. Ámbar (\cod{SEMIABIERTO}): está probando si ya volvió. Roja (\cod{ABIERTO}): repartidores falló varias veces seguidas y el sistema dejó de llamarlo por 10 segundos. \\
+outbox & Cuántos avisos faltan por enviarse. Verde en 0; ámbar si hay pendientes (por ejemplo, con RabbitMQ apagado). \\
+\bottomrule
+\end{tabularx}
+
+\subsection{Como cliente: pedir y pagar}
+\begin{enumerate}
+  \item En la pestaña \textbf{Cliente}, escribe tu nombre, elige tu zona y pulsa \textbf{Crear usuario}.
+  \item Elige un restaurante y la cantidad de cada platillo. El total que ves es informativo: el que
+        cuenta lo calcula el servidor con los precios del menú.
+  \item Pulsa \textbf{Pedir}. El pedido aparece como \cod{PENDIENTE\_PAGO}.
+\end{enumerate}
+\figura[0.62]{img/interfaz-1-menu.png}{Usuario creado y platillos elegidos.}
+\figura[0.62]{img/interfaz-2-pedido.png}{El pedido creado, pendiente de pago.}
+
+\begin{nota}[El botón ``Repetir la misma petición'']
+Manda otra vez el mismo pedido con la misma clave de idempotencia, como haría una aplicación que no
+recibió la respuesta. El sistema contesta con \textbf{el mismo pedido}: no se crea otro ni se cobra dos
+veces. Sirve para demostrar la idempotencia.
+\end{nota}
+
+\begin{enumerate}[resume]
+  \item Pulsa \textbf{Pagar}. El pedido pasa a \cod{PAGADO} y, unos segundos después, llega el aviso
+        \emph{Recibimos tu pago\ldots}. Los avisos viajan por RabbitMQ hasta el servicio de notificaciones.
+\end{enumerate}
+\figura[0.62]{img/interfaz-3-pagado.png}{Pedido pagado y su primer aviso.}
+
+\begin{nota}[Tienes un tiempo para pagar]
+Con la configuración de demostración, un pedido que no se paga en 30 segundos se cancela solo. Un pedido
+pagado que ningún repartidor acepta en 60 segundos se cancela y \textbf{se reembolsa}; a los 30 segundos
+llega un aviso de retraso. (Con valores normales son 10 y 20 minutos.)
+\end{nota}
+
+\subsection{Como repartidor: aceptar y entregar}
+\begin{enumerate}
+  \item En la pestaña \textbf{Repartidor}, elige tu zona y pulsa \textbf{Buscar repartidores}; elige quién
+        eres en la lista.
+  \item La tabla muestra los pedidos \textbf{pagados} de tu zona que nadie ha tomado. Selecciona uno y pulsa
+        \textbf{Aceptar pedido}. Si otro repartidor lo tomó antes, verás el aviso
+        \emph{El pedido ya no está disponible}.
+  \item El cliente ve ahora un \textbf{código de entrega} de seis dígitos. Al entregar, escribe ese código y
+        pulsa \textbf{Confirmar entrega}. Con un código incorrecto, la entrega se rechaza.
+\end{enumerate}
+\figura[0.62]{img/interfaz-4-disponibles.png}{Pedidos pagados de la zona 3, listos para aceptar.}
+\figura[0.62]{img/interfaz-5-aceptado.png}{Pedido aceptado; el repartidor escribe el código que le dio el cliente.}
+
+El botón \textbf{Marcar no disponible} cambia tu disponibilidad; mientras no estés disponible no puedes
+aceptar pedidos.
+
+\subsection{Seguir el pedido}
+De vuelta en \textbf{Cliente}, el pedido termina en \cod{ENTREGADO} y la lista de avisos tiene uno por
+cada cambio (versiones 2, 3 y 4). La versión dice en qué orden ocurrieron, aunque los avisos lleguen
+desordenados.
+\figura[0.62]{img/interfaz-6-entregado.png}{Pedido entregado con sus tres avisos.}
+
+\subsection{La pestaña Sistema}
+Muestra \cod{GET /estado} (circuito y avisos pendientes) y la \textbf{bitácora de peticiones}: cada
+llamada con su código, el tiempo y, para repartidores, qué copia contestó. Los botones abren el panel web,
+Swagger, el panel de Traefik y la consola de RabbitMQ. \textbf{Balanceo} hace 10 consultas a repartidores
+y cuenta cuántas atendió cada una de sus dos copias.
+\figura[0.62]{img/interfaz-7-sistema.png}{La pestaña Sistema después de un pedido completo.}
+
+\section{El panel web}
+
+Abre \url{http://localhost:8080/panel/} en el navegador. No hay que instalar nada: lo sirve el propio
+sistema por el gateway. Tiene tres pestañas:
+
+\begin{itemize}
+  \item \textbf{App}: dos teléfonos (cliente y repartidor) conectados al sistema real y, al lado, la cinta
+        con lo que ve el gateway. Es la pestaña para contar la historia en la presentación.
+  \item \textbf{Pruebas}: \emph{Ejecutar demo} (o la tecla R) corre el flujo completo y marca el tiempo de
+        cada paso: crear, repetir (mismo pedido), reusar la clave con otro pedido (422), pagar, aceptar,
+        entregar y esperar los tres avisos. Trae \emph{Balanceo, 10 consultas}, \emph{Aceptar 6 veces
+        seguidas} y \emph{Ahora rómpelo}, con los comandos de Docker para copiar.
+  \item \textbf{Arquitectura}: el diagrama y las piezas clave del sistema.
+\end{itemize}
+\figura[0.9]{img/panel-web.png}{Pestaña App del panel web, con el sistema sano.}
+
+\section{Ver lo que pasa cuando algo falla}
+
+Las fallas se provocan en la terminal (un navegador o una aplicación no pueden apagar contenedores) y se
+observan en las insignias. Desde \cod{Proyecto}:
+
+\begin{tabularx}{\linewidth}{@{}p{5.4cm} X@{}}
+\toprule
+\textsf{\textbf{Comando}} & \textsf{\textbf{Qué verás}} \\
+\midrule
+\cod{docker compose stop repartidores} & Al aceptar o buscar pedidos, el sistema contesta en 1 s que repartidores no responde; a la tercera vez el circuito se pone en rojo y las respuestas son instantáneas. Los pedidos se siguen creando y pagando. \\
+\cod{docker compose start repartidores} & A los 10 s el circuito prueba, sale bien y vuelve a verde. \\
+\cod{docker compose stop notificaciones} & Los pedidos siguen; los avisos no aparecen. Al hacer \cod{start}, llegan todos, una vez cada uno. \\
+\cod{docker compose stop rabbitmq} & Los pedidos siguen; la insignia \emph{outbox} cuenta los avisos pendientes. Al encenderlo, bajan a 0. \\
+\cod{docker compose restart db} & Errores durante unos segundos; después todo vuelve solo. \\
+\bottomrule
+\end{tabularx}
+
+\figura[0.62]{../bitacora-4/img/interfaz-circuito-abierto.png}{Con repartidores detenido: respuestas de 1 s, luego instantáneas, y el circuito en rojo.}
+
+\section{Para quien prefiere la API}
+
+La documentación interactiva está en \url{http://localhost:8080/docs}. El flujo mínimo con \cod{curl}:
+
+\begin{comando}
+B=http://localhost:8080
+curl -s $B/api/restaurantes                                   # elige un restaurante (id R)
+curl -s $B/api/restaurantes/R/platillos                       # elige un platillo (id P)
+curl -s -X POST $B/api/usuarios -H "Content-Type: application/json" -d '{"nombre":"Ana","zona":3}'
+curl -s -X POST $B/api/pedidos -H "Content-Type: application/json" -H "Idempotency-Key: mi-clave-1" \
+  -d '{"usuario_id":"U","restaurante_id":"R","platillos":[{"platillo_id":"P","cantidad":1}]}'
+curl -s -X POST $B/api/pedidos/ID/pago
+curl -s "$B/api/pedidos/disponibles?repartidor_id=REP"
+curl -s -X POST $B/api/pedidos/ID/aceptar -H "Content-Type: application/json" -d '{"repartidor_id":"REP"}'
+curl -s -X POST $B/api/pedidos/ID/entrega -H "Content-Type: application/json" -d '{"codigo":"123456"}'
+curl -s $B/api/notificaciones/pedido/ID
+\end{comando}
+
+\begin{tabularx}{\linewidth}{@{}l X@{}}
+\toprule
+\textsf{\textbf{Respuesta}} & \textsf{\textbf{Qué significa}} \\
+\midrule
+200 / 201 & Todo bien (201: se creó algo nuevo; 200 al repetir un pedido: es el mismo de antes). \\
+400 & Falta el encabezado \cod{Idempotency-Key}. \\
+404 & No existe (usuario, pedido, repartidor\ldots). \\
+409 & El pedido no está en el estado necesario (por ejemplo, otro repartidor ya lo tomó). \\
+422 & Datos inválidos: otra zona, código incorrecto, repartidor no disponible o una clave reutilizada con otro pedido. \\
+503 & Repartidores no responde o el circuito está abierto. Intenta de nuevo en unos segundos. \\
+\bottomrule
+\end{tabularx}
+
+\section{Problemas frecuentes}
+
+\begin{tabularx}{\linewidth}{@{}X X@{}}
+\toprule
+\textsf{\textbf{Problema}} & \textsf{\textbf{Solución}} \\
+\midrule
+La aplicación dice ``Sin conexión con el sistema'' & Levanta el sistema y espera a que \cod{curl http://localhost:8080/salud} responda. \\
+Error de que una base o tabla no existe & Se levantó con datos de una versión anterior: \cod{docker compose down -v} y vuelve a levantar. \\
+El gateway responde 404 a todo & Traefik viejo con Docker 29: \cod{docker compose pull traefik} y levanta de nuevo. \\
+Un puerto está ocupado & Apaga el programa que usa el 8080, 8081, 15672 o 5432, o cambia el puerto en \cod{docker-compose.yml}. \\
+\cod{python} no abre la ventana en Linux & Instala Tkinter: \cod{sudo apt install python3-tk}. \\
+Mi pedido se canceló solo & No se pagó en 30 s o nadie lo aceptó en 60 s (valores de demostración). \\
+\bottomrule
+\end{tabularx}
+
+\end{document}

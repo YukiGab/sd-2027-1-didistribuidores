@@ -1,0 +1,334 @@
+\documentclass[11pt]{article}
+\makeatletter\def\input@path{{../estilo/}}\makeatother
+\usepackage{didistribuidores}
+\renewcommand{\documentocorto}{Bitácora · Etapa 3}
+
+\begin{document}
+\portada{Bitácora de pruebas}{Etapa 3: repartidores como servicio, gateway y réplicas}%
+  {Traefik como única entrada, dos copias de repartidores, llamada con tiempo límite y aviso de retraso}%
+  {Rama \cod{03-separacion}}{Noviembre de 2026}
+
+\tableofcontents
+\newpage
+
+\section{Qué se construyó en esta etapa}
+
+En la etapa 3 separamos \cod{repartidores} del núcleo. Hasta la etapa 2 era un módulo más, con sus
+tablas en la misma base; ahora es un servicio con \textbf{su propio proceso, su propia base}
+(\cod{repartidores\_db}) y su propia API, y corre en \textbf{dos copias idénticas}. Delante de todo hay un
+\textbf{gateway, Traefik}, que es la única entrada al sistema: los puertos 8000 y 8001 de las etapas
+anteriores ya no existen y todo entra por \url{http://localhost:8080}.
+
+\begin{center}
+\begin{tikzpicture}[node distance=0.8cm and 1.0cm, every node/.style={font=\sffamily\small},
+  caja/.style={draw=azulsd, fill=grisfondo, rounded corners=3pt, minimum height=0.85cm, align=center, text width=2.6cm},
+  fl/.style={-Stealth, thick, azulsd}]
+  \node[caja, fill=azulsd!12] (gw) {Traefik\\\scriptsize :8080, única entrada};
+  \node[caja, below left=1.0cm and 1.4cm of gw] (nuc) {Núcleo};
+  \node[caja, below=1.0cm of gw] (rep) {Repartidores\\\scriptsize 2 copias};
+  \node[caja, below right=1.0cm and 1.4cm of gw] (not) {Notificaciones};
+  \node[caja, below=1.1cm of rep, text width=8.5cm] (pg) {PostgreSQL: \texttt{didistribuidores} · \texttt{repartidores\_db} · \texttt{notificaciones\_db}};
+  \draw[fl] (gw) -- (nuc); \draw[fl] (gw) -- (rep); \draw[fl] (gw) -- (not);
+  \draw[fl, dashed] (nuc) -- node[above,font=\sffamily\scriptsize,align=center]{HTTP directo\\(DNS de Docker, 3 s)} (rep);
+  \draw[fl] (nuc) |- (pg); \draw[fl] (rep) -- (pg); \draw[fl] (not) |- (pg);
+\end{tikzpicture}
+\end{center}
+
+El núcleo y repartidores se hablan por HTTP. El núcleo le pregunta quién es un repartidor, en qué zona
+trabaja y si está disponible, con un tiempo límite de 3 segundos (1 para conectar). Si repartidores no
+responde, el núcleo contesta \cod{503} y no cambia nada.
+
+\begin{nota}[{La decisión que atraviesa las pruebas: repartidores informa, pedidos decide}]
+El sistema sigue priorizando la consistencia: prefiere rechazar una operación que adivinar. Quién gana
+un pedido sigue siendo el \cod{UPDATE} condicional en la base del núcleo; esa regla no cruza la red.
+\end{nota}
+
+Como repartidores ahora puede fallar sin que falle el núcleo, se agregó un \textbf{aviso de retraso}
+(\cod{pedido.retrasado}): si un pedido pagado lleva 30 segundos sin repartidor (10 minutos en valores
+normales), el cliente recibe un aviso; si vence el reloj de asignación, el pedido se cancela y se
+reembolsa como en la etapa 1.
+
+\begin{tabularx}{\linewidth}{@{}l X X@{}}
+\toprule
+\textsf{\textbf{Aspecto}} & \textsf{\textbf{Etapa 2}} & \textsf{\textbf{Etapa 3}} \\
+\midrule
+Repartidores & Módulo del núcleo, esquema en \cod{didistribuidores} & Servicio aparte con \cod{repartidores\_db} \\
+Copias & Una de cada servicio & Dos copias de repartidores \\
+Entrada & Un puerto por servicio (8000 y 8001) & Un solo puerto: el gateway en 8080 \\
+Núcleo a repartidores & Llamada a una función & HTTP con tiempo límite; 503 si no responde \\
+Aviso de retraso & No existía & \cod{pedido.retrasado}, una vez por pedido \\
+Contenedores & 4 & 7 (Traefik, núcleo, notificaciones, 2 de repartidores, RabbitMQ y PostgreSQL) \\
+\bottomrule
+\end{tabularx}
+
+\subsection{Cómo resuelve el sistema las piezas que pide el curso}
+\begin{tabularx}{\linewidth}{@{}l X@{}}
+\toprule
+\textsf{\textbf{Pieza}} & \textsf{\textbf{Dónde vive}} \\
+\midrule
+Gateway & Traefik, configurado con etiquetas de Docker: cada servicio declara su ruta. \\
+Directorio & El DNS de Docker Compose: los servicios se llaman por nombre (\cod{repartidores}, \cod{rabbitmq}, \cod{db}). \\
+Balanceo & Traefik reparte por turnos entre las dos copias y saca de la rotación la que no contesta \cod{/salud}. \\
+\bottomrule
+\end{tabularx}
+
+\section{Despliegue: contenedores, rutas y copias}
+
+\queria Que el sistema se levanta completo con la nueva estructura: siete contenedores, el gateway con
+sus tres rutas y repartidores con dos copias detrás.
+
+\observado Siete contenedores: \cod{app}, \cod{db}, \cod{notificaciones}, \cod{rabbitmq}, \cod{traefik} y
+dos de repartidores, con la base y RabbitMQ en \cod{healthy}. En el panel de Traefik
+(\url{http://localhost:8081}) aparecen los routers \cod{nucleo}, \cod{repartidores} y
+\cod{notificaciones}, y el servicio \cod{repartidores} tiene 2 servidores.
+
+\figura{img/fig-01.png}{\cod{docker compose ps} con los siete contenedores.}
+\figura{img/fig-02.png}{Panel de Traefik: los routers \cod{nucleo}, \cod{repartidores} y \cod{notificaciones}.}
+\figura{img/fig-03.png}{Panel de Traefik: el servicio \cod{repartidores} tiene 2 servidores.}
+
+\section{Preparación de las pruebas}
+
+Todas las funciones hablan con el gateway (\cod{http://localhost:8080}), nunca directo con un servicio.
+\figura{img/fig-04.png}{Variables y funciones auxiliares cargadas antes de las pruebas.}
+
+\begin{tabularx}{\linewidth}{@{}l X@{}}
+\toprule
+\textsf{\textbf{Elemento}} & \textsf{\textbf{Para qué sirve}} \\
+\midrule
+\cod{B} & La dirección del gateway. Es la única que usan las pruebas. \\
+\cod{J} & Un fragmento de Python que lee un JSON y muestra un campo. \\
+\cod{U}, \cod{R}, \cod{P} & Usuario de prueba (zona 3), el primer restaurante (zona 3) y su primer platillo. \\
+\cod{REP}, \cod{REP2} & Dos repartidores de la zona 3 (Sofía Mena y uno creado para competir por el mismo pedido). \\
+\cod{nuevo\_pedido}, \cod{pagar}, \cod{aceptar} & Crear (con clave nueva), pagar y aceptar un pedido. \\
+\cod{estado}, \cod{avisos} & Estado de un pedido y avisos que recibió el cliente. \\
+\cod{instancias} & 10 consultas a repartidores, contando qué copia contestó (encabezado \cod{X-Instancia}). \\
+\cod{psql\_db} & Consulta SQL directa a la base del núcleo. \\
+\bottomrule
+\end{tabularx}
+
+\section{Prueba 1: el gateway enruta cada petición}
+
+\queria Que una sola dirección alcanza para los tres servicios y que el gateway manda cada petición al
+correcto.
+
+\comofunciona Traefik no tiene una lista escrita de servicios: lee las etiquetas de los contenedores.
+Solo se publica lo que lleva \cod{traefik.enable=true}. El núcleo atiende \cod{/api/usuarios},
+\cod{/api/restaurantes}, \cod{/api/pedidos}, \cod{/api/pagos} y \cod{/salud}; repartidores,
+\cod{/api/repartidores}; notificaciones, \cod{/api/notificaciones}.
+
+\begin{comando}
+curl -s $B/api/restaurantes | head -c 200; echo
+curl -s "$B/api/repartidores?zona=3"; echo
+curl -s "$B/api/notificaciones?usuario_id=$U"; echo
+\end{comando}
+
+\observado La lista de restaurantes (núcleo), los repartidores de la zona 3 (repartidores) y una lista
+vacía de avisos (notificaciones). Las tres salieron por \cod{localhost:8080}.
+\figura{img/fig-05.png}{Tres peticiones por la misma dirección, contestadas por tres servicios.}
+
+\section{Prueba 2: balanceo entre las dos copias}
+
+\comofunciona El servicio se declara con \cod{deploy.replicas: 2} y Traefik agrupa los dos contenedores
+en un servicio con dos destinos. Repartidores \textbf{no guarda estado en memoria}: cualquier copia
+puede atender cualquier petición. Cada respuesta lleva \cod{X-Instancia} con el contenedor que contestó.
+
+\begin{comando}
+instancias
+docker ps --format '{{.ID}} {{.Names}}' | grep repartidores
+\end{comando}
+
+\observado Dos identificadores distintos, con \textbf{5 peticiones cada uno}: reparto equilibrado.
+\figura{img/fig-06.png}{Diez peticiones a repartidores: 5 para cada copia.}
+
+\section{Prueba 3: un pedido completo por el gateway}
+
+\comofunciona Al aceptar, el núcleo consulta \cod{GET /api/repartidores/\{id\}} para validar que el
+repartidor existe, está disponible y es de la zona. Esa llamada \textbf{no pasa por el gateway}: usa
+\cod{http://repartidores:8000}, y el DNS de Docker resuelve el nombre a las copias vivas.
+
+\begin{comando}
+ID=$(nuevo_pedido); pagar $ID
+aceptar $ID $REP | python3 -c "$J['estado'])"
+COD=$(curl -s $B/api/pedidos/$ID | python3 -c "$J['codigo_entrega'])")
+curl -s -X POST $B/api/pedidos/$ID/entrega -H "Content-Type: application/json" \
+  -d "{\"codigo\":\"$COD\"}" | python3 -c "$J['estado'])"
+sleep 3; avisos $ID
+docker compose logs repartidores | grep "GET /api/repartidores/" | tail -2
+docker compose logs traefik | grep -c "/api/repartidores/$REP"
+\end{comando}
+
+\observado \cod{ASIGNADO} y \cod{ENTREGADO}, y tres avisos con versiones 2, 3 y 4. El registro de
+repartidores muestra la consulta del núcleo (\cod{200 OK}), y el conteo de esa ruta en el registro de
+Traefik dio \textbf{0}: la llamada interna fue directa.
+\figura{img/fig-07.png}{Pedido completo, consulta interna en repartidores y un 0 en el registro de Traefik.}
+
+\section{Prueba 4: dos repartidores aceptan a la vez}
+
+\begin{comando}
+ID=$(nuevo_pedido); pagar $ID
+( curl -s -o /dev/null -w "REP:  %{http_code}\n" -X POST $B/api/pedidos/$ID/aceptar \
+    -H "Content-Type: application/json" -d "{\"repartidor_id\":\"$REP\"}" &
+  curl -s -o /dev/null -w "REP2: %{http_code}\n" -X POST $B/api/pedidos/$ID/aceptar \
+    -H "Content-Type: application/json" -d "{\"repartidor_id\":\"$REP2\"}" &
+  wait )
+\end{comando}
+
+\observado \cod{REP} recibió 200 y \cod{REP2} 409. La regla de quién gana sigue funcionando aunque el
+registro de repartidores esté en otro servicio.
+\figura{img/fig-08.png}{Aceptación simultánea por el gateway: un 200 y un 409.}
+
+\section{Prueba 5: cae una copia de repartidores}
+
+\comofunciona Si un contenedor se detiene, Traefik lo quita del reparto de inmediato. Si sigue vivo pero
+deja de contestar, el \emph{healthcheck} lo saca: Traefik consulta \cod{/salud} de cada copia cada 5 s
+con 2 s de límite. Como \cod{/salud} hace un \cod{SELECT 1}, una copia sin base también sale.
+
+\begin{comando}
+COPIA=$(docker compose ps -q repartidores | head -1)
+docker stop $COPIA
+for i in $(seq 1 10); do curl -s -o /dev/null -w "%{http_code} " "$B/api/repartidores?zona=3"; done; echo
+instancias
+ID=$(nuevo_pedido); pagar $ID; aceptar $ID $REP | python3 -c "$J['estado'])"
+\end{comando}
+
+\observado Diez \cod{200}, todas atendidas por la copia viva, y el núcleo aceptó un pedido nuevo
+(\cod{ASIGNADO}). Al volver a iniciar la copia, el reparto regresó a 5 y 5.
+\figura{img/fig-09.png}{Con una copia detenida: diez 200 de la misma instancia y el pedido \cod{ASIGNADO}.}
+\figura{img/fig-10.png}{La copia vuelve a atender: otra vez 5 y 5.}
+
+\section{Prueba 6: caen las dos copias (la prueba principal)}
+
+\queria El criterio 5.1 CA2: si repartidores está caído, el cliente se entera y el pedido nunca queda en
+el limbo; al vencer el tiempo se cancela y se reembolsa.
+
+\comofunciona Crear y pagar no dependen de repartidores. Solo aceptar lo consulta: si no hay respuesta,
+el núcleo contesta 503 y no cambia nada (no acepta a ciegas: sin preguntar no sabe si el repartidor
+existe o es de esa zona). La tarea de fondo primero avisa los retrasos y después cancela los vencidos.
+El aviso de retraso se emite una sola vez gracias a la marca \cod{retraso\_avisado}, que se activa en
+la misma transacción que guarda el evento; no cambia la versión del pedido ni reinicia su reloj.
+
+\begin{comando}
+docker compose stop repartidores
+curl -s -i "$B/api/repartidores?zona=3" | head -1
+ID=$(nuevo_pedido); pagar $ID
+estado $ID
+time aceptar $ID $REP
+estado $ID
+\end{comando}
+
+\observado El gateway respondió \cod{504 Gateway Timeout} para repartidores, pero el núcleo creó y pagó
+el pedido. Al aceptar respondió en 0.089 s con \cod{503} y el mensaje \emph{El servicio de repartidores
+no responde}. El pedido siguió \cod{PAGADO}.
+\figura{img/fig-11.png}{Sin repartidores: 504 en el gateway, pedido \cod{PAGADO} y 503 del núcleo.}
+
+\begin{nota}[Lo que encontramos después, en la etapa 4]
+Esos 0.089 s se midieron en Linux. En Docker Desktop para Windows, resolver el nombre de un servicio
+detenido tarda unos 4 s, y el tiempo límite de conexión de \cod{httpx} no cubre la resolución del
+nombre. En la etapa 4 se corrigió el cliente para que la resolución también tenga límite (ver la
+bitácora 4, prueba 4).
+\end{nota}
+
+\begin{comando}
+sleep 40; avisos $ID
+sleep 30; avisos $ID
+curl -s $B/api/pagos/$ID | python3 -c "$J['estado'])"
+\end{comando}
+
+\observado El cliente recibió tres avisos: el pago (versión 2), el retraso (también versión 2, porque no
+cambia el estado) y la cancelación (versión 3, \emph{Tu pago fue reembolsado}). El pago quedó
+\cod{REEMBOLSADO}. Como los comandos se escribieron a mano, entre el pago y la primera consulta pasó más
+de un minuto, por eso la cancelación ya aparece en las dos consultas.
+\figura{img/fig-12.png}{Avisos de pago, retraso y cancelación, y el pago \cod{REEMBOLSADO}.}
+
+\section{Prueba 7: repartidores lento}
+
+\comofunciona Cada llamada tiene 1 s para conectar y 3 s para recibir la respuesta. Sin ese límite, un
+servicio lento dejaría al núcleo sin hilos. Para provocar lentitud sin apagar nada, repartidores tiene
+la variable de prueba \cod{LATENCIA\_MS}, que retrasa todas sus respuestas menos \cod{/salud}.
+
+\begin{comando}
+LATENCIA_MS=5000 docker compose up -d repartidores
+sleep 8
+ID=$(nuevo_pedido); pagar $ID
+time aceptar $ID $REP
+docker compose logs app | grep "\[repartidores\]" | tail -1
+\end{comando}
+
+\observado \cod{503} en \textbf{3.039 s}, no en 5: el núcleo cortó la espera en su límite. El registro
+dice \cod{[repartidores] sin respuesta (ReadTimeout: timed out)}.
+\figura{img/fig-13.png}{Con 5 s de latencia, el núcleo responde 503 a los 3 s.}
+
+\section{Prueba 8: cada servicio tiene su propia base}
+
+\comofunciona Son bases lógicas en una sola instancia de PostgreSQL (el punto único de falla declarado en
+el PRD). \cod{pedidos.repartidor\_id} sigue sin llave foránea, decisión de la etapa 1 para que esta
+separación no rompiera restricciones; la existencia del repartidor se verifica al aceptar.
+
+\begin{comando}
+docker compose exec -T db psql -U postgres -c "\l" | grep -E "didistribuidores|notificaciones_db|repartidores_db"
+docker compose exec -T db psql -U postgres -d didistribuidores -c "\dn"
+docker compose exec -T db psql -U postgres -d repartidores_db -c "SELECT nombre, zona, disponible FROM repartidores ORDER BY zona, nombre"
+\end{comando}
+
+\observado Tres bases. En \cod{didistribuidores} quedan los esquemas \cod{usuarios}, \cod{restaurantes},
+\cod{pedidos} y \cod{pagos}, sin \cod{repartidores}. En \cod{repartidores\_db}, los cinco repartidores
+semilla y el creado para las pruebas.
+\figura{img/fig-14.png}{Las tres bases, los esquemas del núcleo y la tabla de \cod{repartidores\_db}.}
+
+\section{Prueba 9: lo que repartidores sabe lo respeta pedidos}
+
+\begin{comando}
+curl -s -X PATCH $B/api/repartidores/$REP -H "Content-Type: application/json" -d '{"disponible":false}'
+ID=$(nuevo_pedido); pagar $ID
+aceptar $ID $REP
+curl -s -X PATCH $B/api/repartidores/$REP -H "Content-Type: application/json" -d '{"disponible":true}' > /dev/null
+\end{comando}
+
+\observado Al aceptar: \cod{\{"detail":"El repartidor no está disponible"\}} (422). Quien contestó que
+no estaba disponible fue el servicio dueño del dato; el núcleo solo lo consultó y obedeció.
+\figura{img/fig-15.png}{Un repartidor no disponible no puede aceptar.}
+
+\section{Prueba 10: la única entrada es el gateway}
+
+\begin{comando}
+docker compose ps --format "table {{.Service}}\t{{.Ports}}"
+\end{comando}
+
+\observado Solo \cod{traefik} publica puertos de la aplicación (8080 y 8081); \cod{rabbitmq} publica su
+consola (15672) y \cod{db} el 5432, ambos solo para desarrollo. \cod{app}, \cod{notificaciones} y las
+copias de repartidores no publican ninguno.
+\figura{img/fig-16.png}{Puertos publicados: solo Traefik, la consola de RabbitMQ y la base.}
+
+\section{Resumen de la etapa 3}
+
+\begin{longtable}{@{}p{4.2cm} p{7.4cm} l l@{}}
+\toprule
+\textsf{\textbf{Qué se comprobó}} & \textsf{\textbf{Resultado observado}} & \textsf{\textbf{Fig.}} & \textsf{\textbf{Estado}} \\
+\midrule
+Despliegue y gateway & 7 contenedores; 3 routers; repartidores con 2 servidores & 1--3 & \ok \\
+1. Enrutamiento & Núcleo, repartidores y notificaciones por \cod{localhost:8080} & 5 & \ok \\
+2. Balanceo & 5 peticiones para cada copia & 6 & \ok \\
+3. Pedido completo & Asignado y entregado; avisos 2, 3 y 4; la llamada interna no pasa por Traefik & 7 & \ok \\
+4. Aceptación simultánea & Un 200 y un 409 & 8 & \ok \\
+5. Cae una copia & Diez 200 con una instancia; pedido asignado; al volver, 5 y 5 & 9--10 & \ok \\
+6. Caen las dos copias & 504 en el gateway; 503 del núcleo; pedido \cod{PAGADO}; avisos de retraso y cancelación; reembolso & 11--12 & \ok \\
+7. Repartidores lento & 503 a los 3.039 s; \cod{ReadTimeout} en el registro & 13 & \ok \\
+8. Una base por servicio & Tres bases; el núcleo sin esquema \cod{repartidores} & 14 & \ok \\
+9. Disponibilidad & Repartidor no disponible: 422 al aceptar & 15 & \ok \\
+10. Puertos & Solo el gateway expone la aplicación & 16 & \ok \\
+\bottomrule
+\end{longtable}
+
+\section{Quién hizo qué}
+
+\begin{tabularx}{\linewidth}{@{}p{4.2cm} X@{}}
+\toprule
+\textsf{\textbf{Integrante}} & \textsf{\textbf{Aportes en la etapa 3}} \\
+\midrule
+Erick Isaac Echeverria Goicochea (@ErickI07) & Implementación completa: separación de repartidores con base propia, cliente HTTP con tiempo límite (503 si no hay respuesta), gateway Traefik con dos copias, aviso de retraso, las 10 pruebas y el reporte. \\
+Yukioayax Canek Gabriel Hernández (@YukiGab) & Revisión de la etapa. El servicio de notificaciones y la infraestructura de la etapa 2 son la base sobre la que se construyó. \\
+Los dos & Decisiones de alcance y de diseño del PRD; contrato de eventos; revisión cruzada; evidencias y bitácora. \\
+\bottomrule
+\end{tabularx}
+
+\end{document}
