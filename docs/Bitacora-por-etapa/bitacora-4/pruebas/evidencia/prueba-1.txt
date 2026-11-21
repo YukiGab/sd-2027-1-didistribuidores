@@ -1,0 +1,13 @@
+$ curl -s -o /dev/null -w "%{http_code}\n" -X POST $B/api/pedidos -H "Content-Type: application/json" -H "Idempotency-Key: $K" -d "$CUERPO"
+201
+$ curl -s -o /dev/null -w "%{http_code}\n" -X POST $B/api/pedidos -H "Content-Type: application/json" -H "Idempotency-Key: $K" -d "$CUERPO"
+200
+$ curl -s -w "\n%{http_code}\n" -X POST $B/api/pedidos -H "Content-Type: application/json" -H "Idempotency-Key: $K" -d "$OTRO"
+{"detail":"Esa Idempotency-Key ya se usó con un pedido distinto. Usa una clave nueva para un pedido nuevo"}
+422
+$ docker compose exec -T db psql -U postgres -d didistribuidores -c "SELECT count(*) AS pedidos_con_esa_clave, left(max(huella_peticion),16) AS huella FROM pedidos.pedidos WHERE clave_idempotencia='$K'"
+ pedidos_con_esa_clave |      huella      
+-----------------------+------------------
+                     1 | 2e6afbaf6981a79d
+(1 row)
+

@@ -1,18 +1,136 @@
-version: '3.8'
 services:
+  # ---------------------------------------------------------------- gateway
+  traefik:
+    # Debe ser v3.6.1 o más nueva: las anteriores no funcionan con Docker 29 o superior
+    # (arrancan, pero no descubren ningún servicio y responden 404 a todo).
+    image: traefik:v3.6
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false   # solo se publica lo que lleve traefik.enable=true
+      - --entrypoints.web.address=:80
+      - --api.insecure=true                          # panel de Traefik, solo para desarrollo
+      - --accesslog=true
+    ports:
+      - "8080:80"      # ÚNICA entrada pública al sistema: http://localhost:8080
+      - "8081:8080"    # panel de Traefik: http://localhost:8081
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro   # así Traefik se entera de qué contenedores hay
+
+  # ---------------------------------------------------------------- núcleo
   app:
     build: .
-    ports:
-      - "8000:8000"
+    labels:
+      - traefik.enable=true
+      - "traefik.http.routers.nucleo.rule=PathPrefix(`/api/usuarios`) || PathPrefix(`/api/restaurantes`) || PathPrefix(`/api/pedidos`) || PathPrefix(`/api/pagos`) || Path(`/salud`) || Path(`/estado`) || PathPrefix(`/panel`) || PathPrefix(`/docs`) || Path(`/openapi.json`)"
+      - traefik.http.routers.nucleo.entrypoints=web
+      - traefik.http.services.nucleo.loadbalancer.server.port=8000
     environment:
       - DB_HOST=db
       - DB_USER=postgres
       - DB_PASS=postgres
+      - DB_NAME=didistribuidores
+      - TIMEOUT_PAGO_SEG=30
+      - TIMEOUT_ASIGNACION_SEG=60
+      - UMBRAL_RETRASO_SEG=30
+      - REVISION_TIMEOUTS_SEG=5
+      - OUTBOX_ACTIVO=1
+      - RABBITMQ_URL=amqp://sd:sd@rabbitmq:5672/
+      - PUBLICADOR_ACTIVO=1
+      - REPARTIDORES_URL=http://repartidores:8000
+      - REPARTIDORES_TIMEOUT_SEG=3
+      - BREAKER_FALLOS=3           # fallos seguidos que abren el circuito hacia repartidores
+      - BREAKER_PAUSA_SEG=10       # segundos abierto antes de dejar pasar una llamada de prueba
+      - REPARTIDORES_REINTENTOS=1  # un solo reintento, solo cuando es seguro
+    # No depende de repartidores a propósito: el núcleo debe arrancar y seguir funcionando sin él.
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------- repartidores (dos copias)
+  repartidores:
+    build: ./repartidores
+    deploy:
+      replicas: 2      # dos contenedores del mismo servicio; el gateway reparte entre ellos
+    labels:
+      - traefik.enable=true
+      - "traefik.http.routers.repartidores.rule=PathPrefix(`/api/repartidores`)"
+      - traefik.http.routers.repartidores.entrypoints=web
+      - traefik.http.services.repartidores.loadbalancer.server.port=8000
+      # Si una copia deja de contestar /salud, el gateway deja de mandarle tráfico
+      - traefik.http.services.repartidores.loadbalancer.healthcheck.path=/salud
+      - traefik.http.services.repartidores.loadbalancer.healthcheck.interval=5s
+      - traefik.http.services.repartidores.loadbalancer.healthcheck.timeout=2s
+    environment:
+      - DB_HOST=db
+      - DB_USER=postgres
+      - DB_PASS=postgres
+      - DB_NAME=repartidores_db
+      - LATENCIA_MS=${LATENCIA_MS:-0}     # solo para pruebas: LATENCIA_MS=5000 docker compose up -d repartidores
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------- notificaciones
+  notificaciones:
+    build: ./notificaciones
+    labels:
+      - traefik.enable=true
+      - "traefik.http.routers.notificaciones.rule=PathPrefix(`/api/notificaciones`)"
+      - traefik.http.routers.notificaciones.entrypoints=web
+      - traefik.http.services.notificaciones.loadbalancer.server.port=8000
+    environment:
+      - DB_HOST=db
+      - DB_USER=postgres
+      - DB_PASS=postgres
+      - DB_NAME=notificaciones_db
+      - RABBITMQ_URL=amqp://sd:sd@rabbitmq:5672/
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------- infraestructura
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    # El hostname fijo es necesario: RabbitMQ guarda sus datos según el nombre del nodo,
+    # y sin esto cambia en cada contenedor nuevo y las colas persistentes "desaparecen".
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: sd
+      RABBITMQ_DEFAULT_PASS: sd
+    ports:
+      - "15672:15672"   # consola web: http://localhost:15672 (usuario sd, contraseña sd)
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 15s
+
   db:
-    image: postgres:15-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: didistribuidores
     ports:
       - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # -h 127.0.0.1: durante la inicialización Postgres corre un servidor temporal que solo
+      # acepta conexiones por socket. Por TCP solo responde el definitivo, ya con los scripts listos.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d didistribuidores"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pgdata:
+  rabbitmqdata:

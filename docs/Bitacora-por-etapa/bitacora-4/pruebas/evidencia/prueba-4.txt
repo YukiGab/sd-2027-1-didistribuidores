@@ -1,0 +1,24 @@
+$ curl -s $B/estado; echo
+{"repartidores":{"circuito":"CERRADO","fallos_seguidos":0,"abierto_desde_hace_seg":null},"outbox_pendientes":0}
+$ docker compose stop repartidores 2>&1 | tail -2
+ Container proyecto-repartidores-2 Stopped 
+ Container proyecto-repartidores-1 Stopped 
+$ estado_pedido $ID
+PAGADO
+$ for i in 1 2 3 4 5; do echo -n "intento $i: "; aceptar_tiempo $ID $REP; done
+intento 1: 503 en 1.011530s
+intento 2: 503 en 1.011167s
+intento 3: 503 en 1.008160s
+intento 4: 503 en 0.006985s
+intento 5: 503 en 0.007071s
+$ curl -s -X POST $B/api/pedidos/$ID/aceptar -H "Content-Type: application/json" -d "{\"repartidor_id\":\"$REP\"}"; echo
+{"detail":"El servicio de repartidores no está disponible (circuito abierto). Intenta de nuevo en unos segundos"}
+$ curl -s $B/estado; echo
+{"repartidores":{"circuito":"ABIERTO","fallos_seguidos":3,"abierto_desde_hace_seg":0.4},"outbox_pendientes":0}
+$ docker compose start repartidores 2>&1 | tail -2
+ Container proyecto-repartidores-1 Starting 
+ Container proyecto-repartidores-1 Started 
+$ aceptar_tiempo $ID $REP
+200 en 0.046436s
+$ curl -s $B/estado; echo
+{"repartidores":{"circuito":"CERRADO","fallos_seguidos":0,"abierto_desde_hace_seg":null},"outbox_pendientes":1}

@@ -1,0 +1,8 @@
+# Archivos intermedios de LaTeX (se regeneran al compilar)
+*.aux
+*.log
+*.toc
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz

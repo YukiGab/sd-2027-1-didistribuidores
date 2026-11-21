@@ -1,0 +1,12 @@
+# Prueba 4 con el cliente original de la etapa 4 (antes del arreglo del DNS), Docker Desktop en Windows
+$ docker compose stop repartidores
+$ for i in 1 2 3 4 5; do echo -n "intento $i: "; aceptar_tiempo $ID $REP; done
+intento 1: 503 en 8.009274s
+intento 2: 503 en 7.851249s
+intento 3: 503 en 7.842506s
+intento 4: 503 en 0.007197s
+intento 5: 503 en 0.006436s
+# Diagnóstico: dentro del contenedor del núcleo, resolver el nombre de un servicio detenido tarda ~4 s
+$ docker compose exec -T app python -c "import socket,time; t=time.time(); socket.getaddrinfo('repartidores',8000) ..."
+repartidores 4.0 gaierror(-2, 'Name or service not known')
+# El tiempo límite de conexión de httpx (1 s) no cubre la resolución del nombre, y el reintento la duplicaba: ~8 s.

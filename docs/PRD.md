@@ -1,161 +1,117 @@
-# PRD: DiDistribuidores, sistema de pedidos y entrega de comida
+# PRD · DiDistribuidores — Sistema de Gestión y Entrega de Pedidos
 
-Equipo: DiDistribuidores (@YukiGab y @ErickI07). Versión 2, 30 de octubre de 2026.
-
-Somos dos en el equipo, así que de acuerdo con el profesor reducimos el alcance: un núcleo (usuarios, restaurantes, pedidos y pagos simulados) y dos servicios que se separan de él, `notificaciones` y `repartidores`. Todo corre en local con `docker compose up --build`.
+Equipo: DiDistribuidores
+Integrantes: @YukiGab (Yukioayax Canek Gabriel Hernández), @ErickI07 (Erick Isaac Echeverria Goicochea)
+Fecha: 10 de octubre de 2026
+Alcance: primera versión funcional para demostración local durante un mes.
 
 ## 1. Problema y usuarios
 
-Cuando alguien pide comida a domicilio en hora pico, el sistema se pone lento, se pierden pedidos o se cobra dos veces. Muchas veces pasa porque la app reintenta una petición y el servidor la procesa de nuevo.
+La persona que pide comida a domicilio suele enfrentarse a problemas de lentitud, pedidos que se pierden o cobros duplicados. El método actual depende de plataformas que priorizan la disponibilidad sobre la consistencia, lo que genera desconfianza.
 
-El usuario principal es el cliente: quiere pedir, pagar una sola vez y recibir su comida. Los secundarios son el restaurante, que la prepara, y el repartidor, que la entrega. Para nosotros importa más que el pedido y el cobro sean correctos que la velocidad.
+El usuario principal es el cliente que pide comida: necesita realizar un pedido y recibirlo sin que se le cobre dos veces ni se pierda su pedido. Los usuarios secundarios son los restaurantes, que preparan la comida, y los repartidores, que la entregan. El valor del sistema es garantizar la consistencia en la transacción y la logística, incluso si eso significa sacrificar velocidad o disponibilidad en hora pico.
 
-## 2. Por qué es distribuido
+## 2. Por qué es un sistema distribuido
 
-- Un aviso al cliente o la búsqueda de un repartidor no deben impedir que un pedido se confirme. Por eso `notificaciones` y `repartidores` corren en procesos aparte.
-- `repartidores` no guarda estado en memoria, así que se pueden levantar varias copias detrás del gateway para aguantar la hora pico.
-- Cada servicio tiene su propia base lógica. Al comunicarse por la red hay que resolver timeouts, reintentos y duplicados.
+El sistema comienza como un monolito. Después se separan `notificaciones` y `repartidores` para estudiar responsabilidades, comunicación y fallas entre procesos. La frontera importante es entre `pedidos` y `repartidores`: la asignación de un pedido no debe depender de que `repartidores` esté disponible para que `pedidos` siga funcionando. La prioridad es la consistencia sobre la disponibilidad: se prefiere retrasar o rechazar un pedido a perderlo o confundirlo.
 
-La frontera que más importa es la de `pedidos` con `repartidores`: `pedidos` tiene que seguir funcionando aunque `repartidores` esté caído.
+El alcance por internet, por sí solo, no exige microservicios. Esta partición permite cumplir la prioridad del producto y demostrar los temas del curso con tres servicios pequeños. Si el número de usuarios crece, se pueden añadir copias de `repartidores` y medir la cola de eventos; la única instancia PostgreSQL será un límite reconocido antes de prometer más capacidad.
 
-## 3. Alcance
+## 3. Objetivos y lo que no vamos a hacer
 
-Las cuatro funciones del sistema:
+La primera versión tendrá cuatro funciones:
 
-1. Usuarios y menús: registrar un usuario sencillo, ver restaurantes y menús (datos semilla) y crear pedidos.
-2. Pagos simulados: cobrar un pedido sin cobrarlo dos veces.
-3. Repartidores: asignar uno de la misma zona (gana el primero que acepta) y confirmar la entrega con un código.
-4. Notificaciones: avisar al cliente de los cambios de estado de su pedido.
+1. **Registrar usuarios y menús:** permitir a los usuarios registrarse, ver menús y realizar pedidos.
+2. **Procesar pagos simulados:** procesar pagos de forma segura (simulada).
+3. **Asignar repartidores y dar seguimiento:** asignación básica de repartidores con seguimiento en tiempo real.
+4. **Enviar notificaciones:** notificaciones de cambios de estado.
 
-Lo que no hacemos:
+La versión se demostrará localmente con Docker Compose. Quedan fuera: pasarela de pagos real, app móvil nativa, GPS real (coordenadas simuladas), mapa interactivo, chat, correo, notificaciones push y despliegue público. Una interfaz web sencilla, adaptable a teléfono, basta para demostrar los flujos.
 
-- Pasarela de pagos real. El pago se simula.
-- App móvil o interfaz. Solo API detrás de un gateway.
-- GPS ni seguimiento en tiempo real. El cliente consulta el estado del pedido. La zona es un número entero.
-- Disputas de entrega. Solo el repartidor confirma con el código.
-- Módulo de Atención, historial de 6 meses, bases NoSQL y verificación previa con servidores redundantes.
-- Autenticación real. El usuario se identifica con un id, sin contraseña ni token.
-- Aceptación o rechazo del pedido por parte del restaurante. Se asume que prepara todo pedido pagado.
-- Definir quién paga la comida ya preparada si el pedido se cancela.
+## 4. El requisito que perseguimos y lo que dejamos atrás
 
-## 4. Qué priorizamos y qué sacrificamos
+**Prioridad:** la consistencia en los pedidos y los pagos. Que ningún pedido se pierda ni se quede a medias, y que nunca se cobre un pedido que no se confirmó.
 
-Priorizamos la consistencia en pedidos y pagos. Nunca se cobra un pedido que no se confirmó y nunca se pierde uno ya confirmado.
+**Lo que sacrificamos a cambio:**
+- La asignación de repartidor puede tardar más.
+- El seguimiento en tiempo real puede mostrar datos con unos segundos de retraso.
+- El sistema a veces retrasa o rechaza pedidos en hora pico (disponibilidad).
 
-A cambio aceptamos que:
-
-- la asignación de repartidor sea básica, que tarde o que no se logre;
-- el estado del pedido se vea con unos segundos de retraso;
-- en hora pico el sistema retrase o rechace pedidos;
-- los avisos lleguen tarde si `notificaciones` está caído. Preferimos que lleguen tarde a que no lleguen.
+**Lo intocable:** nunca se cobra un pedido que no se confirmó y nunca se pierde un pedido ya confirmado.
 
 ## 5. Historias de usuario
 
 ### 5.1 Realizar un pedido
+**Como** cliente con hambre que ya pagó, **quiero** que mi pedido llegue y que el sistema no me cobre dos veces ni lo pierda, **para** poder comer tranquilo sin estar revisando la app a cada rato.
 
-Como cliente con hambre que ya pagó, quiero que mi pedido llegue sin que me cobren dos veces ni lo pierdan, para comer tranquilo.
+*   **Criterio de aceptación 1 (Idempotencia - Obligatorio):** Dado que ya pagué y confirmé un pedido, cuando mi app reintenta la petición (porque se cayó la red), el sistema debe responderme con el mismo pedido y no generar un cobro ni un pedido nuevo.
+*   **Criterio de aceptación 2 (Consistencia en fallos - Obligatorio):** Dado que ya pagué, cuando el servicio de repartidores se cae o no hay nadie disponible, el sistema debe avisarme al llegar a los 20 minutos para que yo decida qué hacer, y nunca puede dejar mi pedido en el limbo sin avisarme.
+*   **Criterio de aceptación 3 (Entrega única - Obligatorio):** Dado que el repartidor llegó a mi puerta, cuando ingresa el código de confirmación, el pedido debe pasar a "entregado" una sola vez, aunque el repartidor presione el botón dos veces.
 
-- CA1 (idempotencia): si mi app repite la petición con la misma `Idempotency-Key`, el sistema devuelve el mismo pedido y no crea otro ni cobra de nuevo. La clave es `UNIQUE` en la base de `pedidos`, así que dos peticiones simultáneas con la misma clave producen un solo pedido.
-- CA2 (repartidores caído): si `repartidores` está caído o nadie acepta, el sistema me avisa que el pedido sigue en búsqueda. No se queda en el limbo: al vencer el timeout se cancela y se reembolsa.
-- CA3 (entrega única): cuando el repartidor ingresa el código de entrega, el pedido pasa a `ENTREGADO` una sola vez aunque lo envíe dos veces.
+### 5.2 Recibir notificaciones
+**Como** cliente, **quiero** recibir alertas sobre el cambio de estado de mi pedido, **para** saber si va en camino o si ya llegó.
 
-### 5.2 Recibir avisos aunque `notificaciones` esté caído
-
-Como cliente, quiero recibir los avisos de mi pedido aunque el servicio de avisos haya estado apagado, para no perder información.
-
-- CA1: con `notificaciones` apagado, un pedido se crea, se paga y cambia de estado normalmente.
-- CA2: al volver a encender `notificaciones`, llegan los avisos pendientes, cada uno una sola vez.
-- CA3: un mensaje inválido va a una cola de mensajes fallidos y no bloquea a los demás.
-
-### 5.3 Aceptar un pedido (repartidor)
-
-Como repartidor, quiero ver los pedidos de mi zona y aceptar uno, para entregarlo.
-
-- CA1: solo veo pedidos `PAGADO` de mi zona.
-- CA2: si dos repartidores aceptan al mismo tiempo, solo uno se queda con el pedido y el otro recibe un rechazo claro.
-
-### 5.4 Pedido sin repartidor
-
-Como cliente, quiero que mi pedido se cancele y se reembolse si nadie lo entrega a tiempo, para no quedarme sin comida y sin dinero.
-
-- CA1: un pedido `PAGADO` sin repartidor pasa a `CANCELADO` al cumplirse `TIMEOUT_ASIGNACION_SEG` y su pago queda `REEMBOLSADO`.
-- CA2: el reembolso se hace una sola vez, aunque el proceso que cancela corra dos veces.
-
-Deseables: menú en menos de 3 segundos en hora pico, avisos en menos de 10 segundos y un mensaje claro cuando el sistema esté saturado.
+*   **Criterio de aceptación 1 (Obligatorio):** Dado que el pedido cambió de estado, cuando el sistema procesa el evento, debo recibir una notificación con un retraso máximo de unos segundos.
+*   **Criterio de aceptación 2 (Obligatorio):** Dado que el servicio de notificaciones está caído, cuando se recupere, debo recibir las notificaciones pendientes sin que se pierdan ni se dupliquen.
 
 ## 6. Del monolito a los servicios
 
-Primero se construye un monolito modular con los módulos `usuarios`, `restaurantes` (con menús), `pedidos`, `pagos`, `repartidores` y `notificaciones`. Un módulo no consulta las tablas de otro; se hablan por funciones. Después se separan `notificaciones` y `repartidores`.
+En el sistema final, los módulos del monolito son: `usuarios`, `restaurantes`, `pedidos`, `pagos`, `repartidores` y `notificaciones`.
 
-| Servicio | Contiene | Es dueño de |
-|---|---|---|
-| `pedidos` (núcleo) | usuarios, restaurantes, pedidos, pagos | estado del pedido, clave de idempotencia, pagos, tabla `outbox` |
-| `notificaciones` | bandeja de avisos | los avisos y los eventos ya procesados |
-| `repartidores` | repartidores y sus zonas | disponibilidad y zona de cada repartidor |
+**Dueño de la verdad:** `pedidos` es el dueño único del estado del pedido. La clave única para evitar pedidos duplicados y la regla de "gana la primera aceptación del repartidor" viven en el módulo de `pedidos`. `repartidores` solo muestra pedidos disponibles y recibe la aceptación, pero `pedidos` valida y guarda la decisión final.
 
-`pedidos` es el único dueño del estado del pedido. La regla de que gana el primer repartidor que acepta vive ahí, como una actualización condicional: `UPDATE ... WHERE estado = 'PAGADO' AND repartidor_id IS NULL`.
+**Plan de ramas:**
 
-`pagos` se queda dentro del núcleo. Así el cobro, el cambio de estado y el reembolso se hacen en la misma transacción local, y no puede haber cobro sin pedido ni pedido sin cobro.
+| Rama | Resultado comprobable |
+| :--- | :--- |
+| `01-monolito` | Una aplicación y una base. Flujo completo de pedidos y cuenta de demostración. Módulos internos: usuarios, restaurantes, pedidos, pagos, repartidores, notificaciones. |
+| `02-separacion` | Se separa `notificaciones` a otro proceso y otra base lógica. Los pedidos siguen funcionando con ese proceso apagado. Los avisos pendientes se guardan en una cola persistente. |
+| `03-separacion` | Se separa `repartidores` como servicio propio. Se implementa la asignación básica (mostrar a repartidores de la zona, gana el primero que acepta). |
+| `04-resiliencia` | Se verifican reintentos, deduplicación, timeouts y caídas de procesos con pruebas reproducibles. |
 
-Estados del pedido: `PENDIENTE_PAGO → PAGADO → ASIGNADO → ENTREGADO`. Además hay dos cancelaciones por vencimiento, cada una con su reloj:
-
-- `PENDIENTE_PAGO → CANCELADO` si no se paga en `TIMEOUT_PAGO_SEG`. No hubo cobro, así que no hay reembolso.
-- `PAGADO → CANCELADO` si no hay repartidor en `TIMEOUT_ASIGNACION_SEG`. El pago queda `REEMBOLSADO`.
-
-Ramas:
-
-| Rama | Qué se comprueba |
-|---|---|
-| `01-monolito` | Una aplicación y una base. Flujo completo: menú, pedido idempotente, pago simulado, asignación y entrega con código |
-| `02-separacion` | `notificaciones` como proceso aparte. Los pedidos funcionan con él apagado y los avisos pendientes llegan al volver |
-| `03-separacion` | `repartidores` como servicio propio, asignación por zona y puerta única con gateway |
-| `04-resiliencia` | Timeouts, circuit breaker, deduplicación y pruebas de caídas |
-
-Manejo de fallas entre servicios:
-
-- Notificaciones: `pedidos` guarda el cambio de estado y un evento en la tabla `outbox` en la misma transacción. Un publicador manda los eventos pendientes a RabbitMQ. Si `notificaciones` o RabbitMQ están caídos, el evento queda pendiente y se reintenta.
-- Repartidores: si falla o nadie acepta, el pedido sigue `PAGADO` y se avisa al cliente. Al cumplirse el timeout se cancela y se reembolsa en una transacción local.
+**Manejo de fallas entre servicios:**
+Al confirmar un pedido, `pedidos` guarda en una transacción local el pedido y un evento pendiente con ID único. Un proceso publicador lee la tabla de avisos pendientes y publica el evento en la cola persistente. Si `notificaciones` se cae, el evento queda pendiente y se reintenta al recuperarse.
+Si `repartidores` se cae, `pedidos` envía una alerta preventiva y verifica con múltiples servidores redundantes si hay salud en la red. Si falla, el pedido se queda en estado "pendiente" hasta que ocurre un timeout (20 minutos), momento en el cual pasa a "cancelado" y se gatilla el reembolso a través de la cola persistente (Opción A).
 
 ## 7. Dónde vive cada pieza
 
-| Pieza | Dónde vive | Por qué | Si falla |
-|---|---|---|---|
-| API gateway | Traefik, el único servicio con puerto público. Manda `/api/pedidos`, `/api/restaurantes` y `/api/usuarios` al núcleo, `/api/repartidores` a `repartidores` y `/api/notificaciones` a `notificaciones` | Una sola entrada, sin exponer cada servicio | No entran peticiones nuevas, pero los datos guardados no se pierden. Es un punto único de falla que aceptamos para la demo |
-| Directorio | DNS de Docker Compose: los servicios se llaman por nombre (`repartidores`, `rabbitmq`, `db`) | No hace falta montar un registro aparte como Eureka | Si falla el DNS de Docker, los servicios no se encuentran entre sí y hay que reiniciar el entorno |
-| Balanceo | Traefik reparte entre copias de `repartidores` (`docker compose up --scale repartidores=2`). Las copias no guardan estado | Permite escalar y que una copia pueda morir | Si muere una copia, las demás atienden. Si mueren todas, entra el circuit breaker |
-| Datos | Una instancia de PostgreSQL con una base lógica por servicio: `pedidos_db`, `notificaciones_db` y `repartidores_db`. Sin réplicas ni particiones | `pedidos` y `pagos` necesitan transacciones y restricciones `UNIQUE` | Si PostgreSQL cae, no se confirman escrituras. Es un punto único de falla que declaramos. Si el sistema creciera, se particionaría por zona |
-| Operaciones entre servicios | `outbox` más RabbitMQ para los avisos, HTTP con timeout de `pedidos` a `repartidores`, e idempotencia con `Idempotency-Key` y con `eventoId` | Evita transacciones distribuidas y mantiene los servicios desacoplados | Un evento fallido queda pendiente y se reintenta. Uno duplicado se ignora |
-| Manejo de fallas | Timeout HTTP de pocos segundos, circuit breaker de `pedidos` hacia `repartidores`, los dos relojes de pedido y una cola de mensajes fallidos en `notificaciones` | Cada límite evita esperas infinitas y reintentos sin control | Con el circuito abierto, `pedidos` responde rápido sin llamar a `repartidores`. El pedido queda `PAGADO` y se cancela al vencer su reloj |
+| Pieza | Dónde vive | Por qué | Qué pasa si falla |
+| :--- | :--- | :--- | :--- |
+| **API gateway** | Traefik es la única puerta pública. Dirige `/` a la interfaz servida por `pedidos`; `/api/usuarios/`, `/api/restaurantes/`, `/api/pedidos/` y `/api/pagos/` a `pedidos`; `/api/repartidores/` a `repartidores`, y `/api/notificaciones/` a `notificaciones`. | Da una entrada y rutas claras. Es la Opción C elegida para evitar que `pedidos` sea un cuello de botella. | No entran nuevas solicitudes mientras está caído. Los datos ya guardados permanecen; es un punto único de falla aceptado para la demo. |
+| **Directorio / DNS** | DNS interno de Docker Compose para llamadas entre servicios; Traefik descubre contenedores mediante su proveedor Docker. | Evita direcciones IP fijas. | Si Docker o su DNS falla, los procesos no se encuentran; se restablece el entorno y se comprueban rutas antes de continuar. |
+| **Balanceo** | Traefik reparte peticiones entre dos copias sin estado de `repartidores`; ambas usan la misma base de `pedidos`. | Permite observar una réplica caída y continuar con la otra. | Durante la detección pueden fallar peticiones. El cliente reintenta sus pedidos solo con clave de idempotencia; si caen ambas, no se confirma la aceptación del pedido. |
+| **Datos** | Una instancia PostgreSQL para `pedidos` (consistencia transaccional). Bases NoSQL para el resto. Una base lógica por servicio. Sin réplicas ni particiones en esta versión. | Permite propiedad de datos y transacciones locales sin operar un clúster de base de datos. | Si PostgreSQL cae, no se confirman nuevas escrituras. La base es un punto único de falla declarado. |
+| **Operaciones entre servicios** | Eventos pendientes en la base de `pedidos`; `notificaciones` los consulta por HTTP interno y confirma solo después de guardar sus notificaciones. | Confirmar un pedido no depende de una transacción distribuida ni de que `notificaciones` esté disponible. | Si `notificaciones` falla, el evento queda pendiente. No se revierte el pedido y no hace falta una saga compensatoria para este flujo. |
+| **Manejo de fallas** | Consultas internas con timeout de 20 minutos para cancelación y reembolso; reintentos con espera; clave de idempotencia para crear pedidos; notificación única por evento y destinatario. Circuit Breaker para proteger `pedidos` de saturarse si `repartidores` falla (Opción C). | Evita esperas indefinidas y duplicados en reintentos. | La siguiente consulta retoma el trabajo. Un pedido sin confirmación solo se reintenta con la misma clave. Se usa Circuit Breaker para evitar el efecto cascada. |
 
-## 8. Stack y demo
+## 8. Stack y cómo se levanta
 
-Python 3.11 con FastAPI, PostgreSQL 17, RabbitMQ 4, Traefik y Docker Compose. El acceso a la base es con `psycopg`.
+Python y FastAPI se usan en el monolito y los servicios para mantener un solo lenguaje en la API y el proceso que genera notificaciones. PostgreSQL permite guardar pedido y evento en una transacción local y aplicar restricciones de unicidad. Traefik aporta gateway, descubrimiento de contenedores y balanceo. Docker Compose levanta los servicios, la base y la red interna. La interfaz usa HTML, CSS y JavaScript sencillos; no necesita una aplicación móvil independiente.
 
-La demo debe mostrar: hacer un pedido y repetir la petición para ver la idempotencia; apagar `notificaciones`, hacer pedidos y ver que los avisos llegan al volver; y apagar `repartidores` para ver que el pedido se cancela y se reembolsa. Para la demo se usa `TIMEOUT_ASIGNACION_SEG=60` (normal: 20 minutos) y `TIMEOUT_PAGO_SEG=30` (normal: 10 minutos).
+`docker compose up --build` debe levantar el sistema y mostrar una página inicial desde Traefik. La demostración mínima debe permitir: hacer un pedido; consultar su estado; recibir la notificación en menos de 3 minutos; detener `notificaciones` y hacer otro pedido sin perderlo; reiniciar `notificaciones` y recibir una sola notificación; detener una copia de `repartidores` y continuar con la otra; detener PostgreSQL y comprobar que no aparece como confirmado un pedido que no se guardó.
 
 ## 9. Decisiones de arquitectura
 
-| Decisión | Alternativa que descartamos | Por qué |
-|---|---|---|
-| Empezar con un monolito modular y separar por ramas | Crear todos los servicios desde el inicio | Primero se hace funcionar el negocio y después se ve qué cambia al cruzar la red |
-| `pagos` dentro del núcleo | Un servicio `pagos` con su base | Separarlo obligaría a coordinar dos servicios para no cobrar sin pedido, y con dos personas no alcanza |
-| Idempotencia con `UNIQUE` en la base | Un diccionario en memoria que revisa si ya existe | El diccionario deja un hueco entre revisar y guardar. La base lo resuelve de forma atómica |
-| `outbox` y RabbitMQ para los avisos | Llamar a `notificaciones` por HTTP dentro de la petición | Que fallen los avisos no debe bloquear ni deshacer un pedido |
-| Reembolso en la misma transacción que la cancelación | Reembolso por una cola aparte | Como `pagos` está en el núcleo, una transacción local es más simple y segura |
-| Separar primero `notificaciones` y luego `repartidores` | Separar `pagos` primero | `notificaciones` es el caso más sencillo de mensajería y `repartidores` depende de que el pedido ya exista |
-| Dos relojes de pedido configurables: pago (10 min) y asignación (20 min) | Un solo reloj, o esperar sin límite | Cada uno protege una regla distinta y se pueden acortar para la demo |
-| Circuit breaker de `pedidos` hacia `repartidores` | Reintentar sin límite | Evita llenar `pedidos` de llamadas que van a fallar |
-| Una instancia de PostgreSQL con una base lógica por servicio | Una instancia por servicio, o NoSQL | Cada servicio es dueño de sus datos sin multiplicar contenedores. El costo es un punto único de falla |
-| Traefik como gateway y DNS de Compose como directorio | Spring Cloud Gateway y Eureka (lo del lab de Java) | Usamos Python, y Docker ya resuelve los nombres |
+| Decisión | Alternativa descartada para esta versión | Por qué |
+| :--- | :--- | :--- |
+| Empezar con un monolito y separar por ramas. | Crear todos los servicios desde el primer día. | Primero se comprueba el flujo y después se hace visible el efecto de cruzar la red. |
+| Conservar pedidos y eventos pendientes en la misma transacción local. | Enviar notificaciones dentro de la solicitud del pedido. | Una falla de notificaciones no impide guardar el pedido. |
+| Separar `notificaciones` y `repartidores` como servicios. | Dividir también `pagos` y `restaurantes` desde el inicio. | Hay tres fronteras defendibles sin multiplicar llamadas y bases. `pagos` sigue presente pero acoplado para garantizar consistencia. |
+| Usar cola persistente para notificaciones y reembolsos. | Enviar notificaciones dentro de la solicitud del pedido. | Una falla de notificaciones no impide guardar el pedido. |
+| Usar una instancia PostgreSQL con bases separadas. | Réplicas y particiones sin carga media. | La prioridad es demostrar propiedad de datos y fallas entre servicios. Se reconoce la falla de la base única. |
+| Usar consulta periódica de eventos por HTTP interno. | Añadir un broker desde el inicio. | Da entrega diferida recuperable con menos componentes para operar en un mes. |
 
-## 10. Decisiones tomadas y pendientes
+## 10. Preguntas abiertas y desacuerdos
 
-1. `pagos` se queda dentro del núcleo.
-2. Hay dos relojes de pedido configurables por variable de entorno, además del timeout HTTP entre servicios.
-3. Los pedidos viejos no se archivan ni se borran.
-4. La zona es un entero de 1 a 5.
-5. Si vence `TIMEOUT_ASIGNACION_SEG` sin repartidor, el pedido se cancela y se reembolsa solo.
-6. Aceptamos los recortes de alcance de la sección 3.
-7. Acceso a la base con `psycopg` directo.
-8. El profesor confirmó el alcance: núcleo más `notificaciones` y `repartidores`.
-9. El restaurante no acepta pedidos y el módulo de Atención se elimina.
+No hubo registros ni desacuerdos.
+
+**Preguntas abiertas (para el arquitecto y la defensa):**
+1. **Claves no concluidas:** ¿Cuál es el número exacto de duración de las claves de pedidos no concluidos? (Se habló de 10-20 min, falta fijar uno).
+2. **Vida de los pedidos:** ¿Qué pasa exactamente con los pedidos pasados los 6 meses (se borran, se archivan en frío)?
+3. **Criterio de "zona":** ¿Cómo definen "cercanos en la zona" sin GPS real (por colonia, por número de zona)?
+4. **Cliente sin repartidor:** Si pasan los 20 minutos y el cliente "decide qué hacer", ¿qué opciones exactas tiene y qué pasa con su cobro?
+5. **Disputas:** Quedó fuera el caso de "el repartidor dice que entregó pero el cliente dice que no llegó". ¿Lo dejan explícitamente fuera de alcance o lo manejan con el módulo de Atención?
+6. **Dueño de piezas nuevas:** ¿Quién es el dueño de la cola persistente, la tabla de avisos pendientes y el proceso publicador? ¿Dónde viven exactamente?
+7. **Costo de fallos:** Si el restaurante ya cocinó y el servicio de `repartidores` falla justo después del pre-check, ¿quién asume el costo de la comida preparada (el restaurante, la plataforma o el cliente)?
+8. **Aclaración de timeout:** Se definió un timeout de 20 minutos para la cancelación y reembolso. ¿Existe un timeout más corto (3-5 minutos) para reintentos de red internos entre servicios, o el timeout de 20 minutos aplica para ambos casos?
+9. **Módulo de Atención:** Se mencionó un servicio paralelo de `Atención` para gestionar inconsistencias (como un pedido forzado a "entregado" que el cliente no recibió). ¿Es un servicio completamente nuevo en la arquitectura o es una funcionalidad dentro de `pedidos`?

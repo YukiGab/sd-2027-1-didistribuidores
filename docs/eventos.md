@@ -41,12 +41,25 @@ Todos los eventos tienen los mismos campos:
 | Exchange (topic, durable) | `pedidos.eventos` |
 | Routing key | el valor de `tipo` |
 | Cola principal (durable) | `notificaciones.pedidos`, enlazada con `pedido.*` |
-| Cola de mensajes fallidos | `notificaciones.pedidos.dlq` |
+| Exchange de mensajes fallidos (direct, durable) | `pedidos.eventos.dlx` |
+| Cola de mensajes fallidos (durable) | `notificaciones.pedidos.dlq`, enlazada al exchange de fallidos con la clave `notificaciones.pedidos` |
 | Mensajes | persistentes |
 
-`notificaciones` hace el ack después de guardar el aviso en su base. Si el mensaje es inválido, va a la cola de mensajes fallidos.
+`notificaciones` hace el ack después de guardar el aviso en su base. Si el mensaje es inválido, lo rechaza sin reencolar y va a la cola de mensajes fallidos.
 
-## Tabla `outbox` (en `pedidos_db`)
+La cola principal se declara con `x-dead-letter-exchange` apuntando al exchange de fallidos, así
+que un mensaje rechazado sin reencolar llega solo a la cola de fallidos.
+
+El exchange y las colas los declaran tanto el publicador (núcleo) como el consumidor
+(`notificaciones`), con exactamente los mismos argumentos. Así los mensajes esperan en la cola
+aunque `notificaciones` no haya arrancado nunca. Los dos archivos son
+`Proyecto/app/modulos/pedidos/topologia.py` y `Proyecto/notificaciones/app/topologia.py`, y deben
+mantenerse idénticos.
+
+El publicador entrega cada evento **al menos una vez** (solo lo marca como publicado cuando RabbitMQ
+lo confirma); el consumidor ignora los duplicados por `eventoId`.
+
+## Tabla `outbox` (en la base del núcleo, `didistribuidores`)
 
 | Columna | Tipo | Nota |
 |---|---|---|

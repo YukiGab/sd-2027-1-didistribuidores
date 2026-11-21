@@ -1,0 +1,34 @@
+$ LATENCIA_MS=5000 docker compose up -d repartidores 2>&1 | tail -2
+ Container proyecto-repartidores-2 Starting 
+ Container proyecto-repartidores-2 Started 
+$ for i in 1 2 3 4 5 6; do echo -n "intento $i: "; aceptar_tiempo $ID $REP; done
+intento 1: 503 en 3.023347s
+intento 2: 503 en 3.024089s
+intento 3: 503 en 3.021745s
+intento 4: 503 en 0.006685s
+intento 5: 503 en 0.006974s
+intento 6: 503 en 0.006944s
+$ curl -s $B/estado; echo
+{"repartidores":{"circuito":"ABIERTO","fallos_seguidos":3,"abierto_desde_hace_seg":0.4},"outbox_pendientes":0}
+$ docker compose logs app 2>&1 | grep -E "circuito|\[repartidores\]" | tail -5
+app-1  | WARNING:  [circuito repartidores] SEMIABIERTO -> CERRADO (la llamada de prueba salió bien)
+app-1  | WARNING:  [repartidores] sin respuesta a tiempo (ReadTimeout: timed out)
+app-1  | WARNING:  [repartidores] sin respuesta a tiempo (ReadTimeout: timed out)
+app-1  | WARNING:  [repartidores] sin respuesta a tiempo (ReadTimeout: timed out)
+app-1  | WARNING:  [circuito repartidores] CERRADO -> ABIERTO (3 fallos seguidos)
+--- recuperación: se quita el retraso
+$ docker compose up -d repartidores 2>&1 | tail -2
+ Container proyecto-repartidores-2 Starting 
+ Container proyecto-repartidores-2 Started 
+$ aceptar_tiempo $ID $REP
+200 en 0.044374s
+$ aceptar_tiempo $ID $REP
+200 en 0.035672s
+$ curl -s $B/estado; echo
+{"repartidores":{"circuito":"CERRADO","fallos_seguidos":0,"abierto_desde_hace_seg":null},"outbox_pendientes":0}
+$ docker compose logs app 2>&1 | grep "circuito" | tail -3
+app-1  | WARNING:  [circuito repartidores] CERRADO -> ABIERTO (3 fallos seguidos)
+app-1  | WARNING:  [circuito repartidores] ABIERTO -> SEMIABIERTO (pasó la pausa, se deja pasar una llamada de prueba)
+app-1  | WARNING:  [circuito repartidores] SEMIABIERTO -> CERRADO (la llamada de prueba salió bien)
+$ estado_pedido $ID
+ASIGNADO
