@@ -3,7 +3,7 @@
 ## ¿Qué es el sistema?
 
 Es un sistema distribuido para pedidos de comida a domicilio. Un cliente consulta el menú de un
-restaurante, hace un pedido, lo paga (pago simulado) y un repartidor lo recoge y lo entrega.
+restaurante, hace un pedido, lo paga y un repartidor lo recoge y lo entrega.
 
 Su prioridad es la **consistencia sobre la disponibilidad**: preferimos retrasar o rechazar un
 pedido antes que perderlo, duplicarlo o cobrarlo dos veces.
@@ -45,21 +45,20 @@ Materia: Sistemas Distribuidos 2027-1, Grupo 2, FI-UNAM.
 - **Núcleo:** usuarios, restaurantes, pedidos y pagos. Es el dueño del estado del pedido.
 - **Repartidores:** quién es cada repartidor, su zona y su disponibilidad. Corre en dos copias.
 - **Notificaciones:** consume los eventos de los pedidos y guarda los avisos del cliente.
-- **Traefik:** única entrada al sistema; enruta cada petición y reparte la carga entre copias.
+- **Traefik:** única entrada al sistema, enruta cada petición y reparte la carga entre copias.
 - **RabbitMQ:** cola persistente entre el núcleo y notificaciones.
 
 ## ¿Cómo se levanta?
 
-Requisitos: Docker y Docker Compose (y Python 3.9 o más nuevo para la aplicación de escritorio).
+Requisitos: Docker y Docker Compose (y Python 3.9).
 
 ```bash
 cd Proyecto
 docker compose up --build
 ```
 
-Todo el sistema entra por un solo puerto, el del gateway: <http://localhost:8080>
-(documentación interactiva en `/docs`). El panel de Traefik queda en <http://localhost:8081> y la
-consola de RabbitMQ en <http://localhost:15672> (usuario `sd`, contraseña `sd`).
+Todo el sistema entra por un solo puerto, el del gateway: <http://localhost:8080>. 
+El panel de Traefik queda en <http://localhost:8081> y la consola de RabbitMQ en <http://localhost:15672> (usuario `sd`, contraseña `sd`).
 Al arrancar con las bases vacías se cargan datos de prueba: 3 restaurantes con menú y 5 repartidores.
 
 ```bash
@@ -80,7 +79,7 @@ docker compose down -v     # apaga y borra los datos (se vuelven a cargar los de
 | Swagger | <http://localhost:8080/docs> | Probar cada endpoint a mano |
 
 Las dos interfaces solo llaman a la API por el gateway: muestran, nunca deciden. El uso paso a paso,
-con capturas, está en el [manual de usuario](documentacion/manual-de-usuario/manual-de-usuario.pdf).
+con capturas, está en el [manual de usuario](docs/manual-de-usuario.pdf).
 
 ## Endpoints principales
 
@@ -117,13 +116,10 @@ tiempo, o nadie toma un pedido pagado, el pedido se cancela y, si había cobro, 
 ├── docs/
 │   ├── PRD.md                 requisitos, alcance y decisiones de arquitectura
 │   ├── eventos.md             contrato de los eventos entre servicios
-│   └── reporte-final.pdf      reporte final del proyecto (copia del de documentacion/)
-├── documentacion/
-│   ├── bitacora-1 … bitacora-4/   bitácora de pruebas de cada etapa (.tex, .pdf y capturas)
-│   ├── pruebas/               plan y resultados de todas las pruebas (PDF y Word) y la regresión
-│   ├── manual-de-usuario/     cómo levantar y usar el sistema y sus interfaces
-│   ├── documentacion-final/   reporte final (.tex y .pdf)
-│   └── estilo/                estilo LaTeX común a todos los documentos
+│   ├── reporte-final.pdf      reporte final del proyecto
+│   ├── manual-de-usuario.pdf  cómo levantar y usar el sistema y sus interfaces
+│   ├── pruebas/               plan y resultados de todas las pruebas (PDF)
+│   └── Bitacora-por-etapa/    bitácoras de pruebas de las etapas 1 a 4
 └── Proyecto/
     ├── docker-compose.yml     Traefik, núcleo, repartidores (2 copias), notificaciones, RabbitMQ y PostgreSQL
     ├── Dockerfile
@@ -174,7 +170,7 @@ es resolver primero la lógica de negocio y las fronteras entre módulos, para q
 módulo en un servicio sea cambiar una llamada a función por una llamada de red.
 
 **Consistencia.** Como la prioridad del sistema es no duplicar ni perder pedidos, las garantías no
-dependen del código de Python sino de la base de datos:
+dependen del código sino de la base de datos:
 
 - La **idempotencia** se resuelve con una restricción `UNIQUE` sobre la clave de cada pedido. Si
   llegan varias peticiones iguales a la vez, la base deja pasar una y las demás reciben el mismo pedido.
@@ -278,6 +274,6 @@ El sistema empieza como un monolito y se parte por etapas, cada una en su rama.
   levantarlo, qué falta y quién hizo qué.
 - [PRD](docs/PRD.md): problema, alcance, "dónde vive cada pieza" y decisiones de arquitectura.
 - [Contrato de eventos](docs/eventos.md): formato de los eventos entre `pedidos` y `notificaciones`.
-- [Bitácoras por etapa](documentacion/): pruebas con evidencia de las etapas 1 a 4.
-- [Pruebas del proyecto](documentacion/pruebas/): todas las pruebas, en PDF y en Word.
-- [Manual de usuario](documentacion/manual-de-usuario/manual-de-usuario.pdf).
+- [Bitácoras por etapa](docs/Bitacora-por-etapa/): pruebas con evidencia de las etapas 1 a 4, con un README por etapa.
+- [Pruebas del proyecto](docs/pruebas/pruebas-del-proyecto.pdf): plan y resultados de todas las pruebas.
+- [Manual de usuario](docs/manual-de-usuario.pdf): cómo levantar el sistema y usar la aplicación de escritorio, el panel web y la API.
