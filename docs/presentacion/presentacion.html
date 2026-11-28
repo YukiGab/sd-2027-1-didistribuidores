@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DiDistribuidores · Presentación</title>
+<style>
+/* Paleta: fondo #F5F3EE, principal #14213D, acento #E4572E · Tipografía: Segoe UI Variable / Cascadia Code */
+:root{--bg:#F5F3EE;--card:#FFFFFF;--ink:#14213D;--mu:#5B6475;--li:#DAD6CC;--ac:#E4572E;--ok:#2A9D60;--er:#D7263D;--wr:#D99A00;--soft:#ECE8DF}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;background:#0b0f19;overflow:hidden}
+body{font-family:"Segoe UI Variable Text","Segoe UI",Inter,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+.deck{position:fixed;left:50%;top:50%;width:1280px;height:720px;transform-origin:center;overflow:hidden;background:var(--bg)}
+.s{position:absolute;inset:0;padding:60px 92px 64px;opacity:0;visibility:hidden;transition:opacity .35s ease;background:var(--bg);display:flex;flex-direction:column}
+.s.on{opacity:1;visibility:visible}
+.s.ink{background:var(--ink);color:#F5F3EE}.s.soft{background:var(--soft)}
+h1,h2,.big{font-family:"Segoe UI Variable Display","Segoe UI",Inter,system-ui,sans-serif;letter-spacing:-.025em}
+h1{font-size:92px;line-height:1;font-weight:800}
+h2{font-size:48px;line-height:1.08;font-weight:750;max-width:1000px}
+p{font-size:23px;line-height:1.45;color:var(--mu);max-width:820px}
+.ink p{color:#B9C0CF}
+.k{font-size:16px;letter-spacing:.12em;text-transform:uppercase;color:var(--ac);font-weight:700;margin-bottom:12px}
+.big{font-weight:800;color:var(--ac);line-height:.95}
+.mono{font-family:"Cascadia Code",Consolas,ui-monospace,monospace}
+.hint{font-size:14px;color:var(--mu);margin-top:auto;padding-top:8px}
+.ink .hint{color:#8C96AA}
+button{font:inherit;cursor:pointer;border:0}
+.btn{background:var(--ink);color:#fff;border-radius:999px;padding:9px 18px;font-size:16px;font-weight:600}
+.btn.ac{background:var(--ac)}.btn.ghost{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 2px var(--li)}
+.btn:hover{filter:brightness(1.1)}
+.pill{display:inline-block;border-radius:999px;padding:5px 13px;font-size:14px;font-weight:700}
+.p-ok{background:#DDF3E6;color:var(--ok)}.p-er{background:#FBE0E4;color:var(--er)}.p-wr{background:#FCEFC9;color:#946800}.p-mu{background:var(--soft);color:var(--mu)}
+.card{background:var(--card);border-radius:20px;padding:20px 22px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+@keyframes in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.in{animation:in .35s both}
+.who{position:absolute;top:22px;right:28px;font-size:14px;font-weight:700;border-radius:999px;padding:6px 14px 6px 10px;display:flex;align-items:center;gap:8px;z-index:3}
+.who i{width:10px;height:10px;border-radius:50%;display:block}
+.who.e{background:#DCE3F2;color:#14213D}.who.e i{background:#14213D}
+.who.y{background:#FBE1D7;color:#B23A17}.who.y i{background:var(--ac)}
+.who.d{background:#E9E5DC;color:var(--ink)}.who.d i{background:linear-gradient(90deg,#14213D 50%,#E4572E 50%)}
+.ink .who.e{background:#2E3D63;color:#fff}.ink .who.e i{background:#fff}
+.ink .who.y{background:#5A2A1E;color:#FFB59B}
+.ink .who.d{background:#2E3D63;color:#fff}
+.tagE,.tagY{display:inline-block;font-size:13px;font-weight:700;border-radius:999px;padding:3px 10px;margin-top:10px}
+.tagE{background:#DCE3F2;color:#14213D}.tagY{background:#FBE1D7;color:#B23A17}
+.cover{justify-content:center}
+.cover h1 span{color:var(--ac)}
+.cover .tag{margin-top:22px;font-size:34px;color:#F5F3EE;max-width:820px;line-height:1.25}
+.cover .who2{margin-top:52px;font-size:20px;color:#B9C0CF}
+.cover .c1{position:absolute;right:-120px;top:-120px;width:520px;height:520px;border-radius:50%;background:var(--ac)}
+.cover .c2{position:absolute;right:120px;bottom:-200px;width:360px;height:360px;border-radius:50%;border:2px solid #2E3D63}
+.ctx{display:grid;grid-template-columns:310px 1fr;gap:40px;flex:1;margin-top:16px}
+.actors div{display:flex;gap:14px;align-items:flex-start;padding:13px 0;border-top:1px solid var(--li)}
+.actors div:first-child{border:0}
+.actors b{display:block;font-size:21px}.actors span{font-size:16px;color:var(--mu);line-height:1.35}
+.actors i{font-style:normal;flex:none;width:44px;height:44px;border-radius:12px;background:var(--card);display:grid;place-items:center;font-size:22px}
+.steps{display:flex;gap:8px;margin-bottom:14px}
+.steps button{flex:1;background:var(--card);border-radius:14px;padding:11px 10px;font-size:16px;font-weight:600;color:var(--mu);text-align:left}
+.steps button b{display:block;font-size:12px;color:var(--ac);letter-spacing:.08em}
+.steps button.sel{background:var(--ink);color:#fff}
+.chain{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0 14px}
+.chain span{background:var(--card);border-radius:10px;padding:9px 13px;font-size:15px;font-weight:600;color:#A7AFBF;transition:all .25s}
+.chain span.lit{background:var(--ac);color:#fff;transform:translateY(-2px)}
+.chain em{font-style:normal;color:#C4BFB3}
+.ctxlist{list-style:none;padding:0;min-height:150px}
+.ctxlist li{font-size:18px;line-height:1.4;padding:6px 0 6px 30px;position:relative;color:var(--ink)}
+.ctxlist li:before{content:attr(data-n);position:absolute;left:0;top:7px;width:20px;height:20px;border-radius:50%;background:var(--ac);color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center}
+.scope{display:grid;grid-template-columns:.8fr 1.4fr;gap:60px;flex:1;align-items:center}
+.scope .big{font-size:220px}
+.lst{list-style:none;padding:0}.lst li{font-size:21px;padding:9px 0;border-top:1px solid var(--li);color:var(--mu)}
+.lst li:first-child{border:0}.lst.no li{text-decoration:line-through;text-decoration-color:#B8B2A5}
+.lst.yes li{color:var(--ink);font-weight:600}.lst.yes li:before{content:"✓  ";color:var(--ok)}
+.lab{font-size:14px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--mu);margin:0 0 4px}
+.vs{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:28px}
+.vs .card h3{font-size:21px;margin-bottom:10px}
+.vs ol{padding-left:20px;font:16px/1.75 "Cascadia Code",Consolas,monospace;color:var(--ink)}
+.tot{display:flex;align-items:baseline;gap:10px;border-top:1px solid var(--li);padding-top:8px;margin-top:10px}
+.tot .big{font-size:54px}.tot span{font-size:16px;color:var(--mu)}
+.bad .big{color:var(--er)}.good .big{color:var(--ok)}
+.gar{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:40px}
+.gar div{background:var(--card);border-radius:20px;padding:24px;min-height:220px;display:flex;flex-direction:column}
+.gar b{font-size:52px;color:var(--ac);line-height:1}
+.gar span{font-size:21px;font-weight:600;margin-top:auto;line-height:1.3}
+.gar small{font-size:14px;color:var(--mu);margin-top:8px;display:block}
+.tl{display:grid;grid-template-columns:repeat(4,1fr);margin-top:56px;position:relative}
+.tl:before{content:"";position:absolute;left:0;right:0;top:15px;height:2px;background:var(--li)}
+.tl div{position:relative;padding-top:48px;padding-right:22px}
+.tl div:before{content:"";position:absolute;top:6px;left:0;width:20px;height:20px;border-radius:50%;background:var(--ac)}
+.tl small{display:block;font-size:13px;color:var(--ac);font-weight:700;letter-spacing:.06em}
+.tl b{display:block;font-size:28px;letter-spacing:-.02em;margin:2px 0 8px}
+.tl span{font-size:18px;color:var(--mu);line-height:1.4;display:block}
+.tl span.tagE,.tl span.tagY{display:inline-block;font-size:13px;color:inherit}
+.tl span.tagE{color:#14213D}.tl span.tagY{color:#B23A17}
+.arq{display:grid;grid-template-columns:1.8fr .85fr;gap:44px;align-items:center;flex:1}
+.arq svg{width:100%}
+.arq svg text{font:14px "Segoe UI",system-ui,sans-serif;fill:#14213D}.arq svg .m{fill:#5B6475}.arq svg .t{font-weight:600}
+.arq svg rect{fill:#fff;stroke:#DAD6CC}.arq svg .h rect{fill:#14213D;stroke:none}
+.arq svg path{stroke:#8E8E93;fill:none;stroke-width:1.6}
+.cal div{padding:14px 0;border-top:1px solid var(--li);font-size:21px;line-height:1.35;color:var(--mu)}.cal div:first-child{border:0}
+.cal b{display:block;color:var(--ink);font-size:23px}
+.row2{display:grid;grid-template-columns:1.2fr 1fr;gap:56px;align-items:end;flex:1}
+.code{background:var(--ink);color:#F5F3EE;border-radius:18px;padding:26px 30px;font-size:21px;line-height:1.6}
+.code .a{color:#FF9A76}.code .d{color:#8C96AA}
+.stat{font-size:150px}.capt{font-size:21px;color:var(--mu);margin-top:10px;max-width:420px}
+.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:40px;counter-reset:n}
+.flow div{background:var(--card);border-radius:22px;padding:24px 22px;min-height:200px;font-size:19px;color:var(--mu);line-height:1.4;counter-increment:n}
+.flow div:before{content:counter(n);display:block;font-size:16px;font-weight:700;color:var(--ac);margin-bottom:10px}
+.flow b{display:block;font-size:24px;color:var(--ink);margin-bottom:8px;letter-spacing:-.02em}
+.bottom{margin-top:auto;display:flex;align-items:baseline;gap:22px}.bottom span{font-size:22px;color:var(--mu)}.bottom .big{font-size:86px;white-space:nowrap;flex:none}
+.cb{display:grid;grid-template-columns:1.15fr 1fr;gap:34px;margin-top:18px;flex:1}
+.sm{display:flex;align-items:center;gap:12px;margin:6px 0 16px}
+.sm .pill{font-size:19px;padding:11px 20px;opacity:.35;transition:all .3s}
+.sm .pill.cur{opacity:1;transform:scale(1.08)}
+.sm .ar{color:var(--mu);font-size:13px;text-align:center;line-height:1.2}
+.meter{display:flex;gap:8px;margin:6px 0 12px}
+.meter i{width:46px;height:14px;border-radius:7px;background:var(--soft)}
+.meter i.on{background:var(--er)}
+.cbl{font:15px/1.65 "Cascadia Code",Consolas,monospace;background:var(--card);border-radius:16px;padding:14px 18px;height:300px;overflow:hidden}
+.cnt{font-size:16px;color:var(--mu);min-height:24px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:32px}
+.tests{display:grid;grid-template-columns:1fr 1fr;gap:44px;margin-top:26px;flex:1}
+.tnum{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.tnum div{background:var(--card);border-radius:14px;padding:14px 10px}
+.tnum b{display:block;font-size:38px;color:var(--ac);line-height:1}
+.tnum span{font-size:13px;font-weight:600;color:var(--mu)}
+.ba{display:flex;align-items:flex-end;gap:26px;margin-top:10px}
+.ba .big{font-size:96px}.ba .old{color:#B8B2A5}.ba .ar{font-size:54px;color:#C4BFB3;padding-bottom:14px}
+.vid{display:grid;grid-template-columns:290px 1fr;gap:22px;flex:1;margin-top:10px;min-height:0}
+.chap{display:flex;flex-direction:column;gap:5px}
+.chap button{background:#1B2A4D;color:#D7DDEA;border-radius:10px;padding:8px 12px;font-size:14px;font-weight:600;text-align:left;display:flex;justify-content:space-between}
+.chap button span{color:#8C96AA;font-weight:500}
+.chap button.sel{background:var(--ac);color:#fff}.chap button.sel span{color:#fff}
+.keys{font-size:13px;color:#8C96AA;margin-top:10px;line-height:1.6}
+.keys b{color:#FFB59B}
+.screen{background:#000;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 0 0 2px #2E3D63;min-height:0}
+.screen video{flex:1;width:100%;min-height:0;background:#000;cursor:pointer}
+.vctl{display:flex;align-items:center;gap:10px;padding:7px 10px;background:#1B2A4D;font-size:13px;color:#B9C0CF}
+.vbar{flex:1;height:6px;background:#2E3D63;border-radius:3px;cursor:pointer;position:relative}.vbar i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--ac);border-radius:3px}
+.qa{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:40px}
+.qa div{border-top:3px solid var(--ac);padding-top:14px}
+.qa b{display:block;font-size:23px;color:#fff}.qa span{font-size:17px;color:#B9C0CF;line-height:1.4}
+.prog{position:fixed;left:0;top:0;height:4px;background:var(--ac);width:0;z-index:9;transition:width .3s}
+.nav{position:fixed;right:18px;bottom:14px;z-index:11;display:flex;gap:6px;align-items:center;font:13px "Segoe UI",system-ui;color:#8C96AA}
+.nav button{background:#14213D;opacity:.75;color:#fff;border-radius:8px;width:34px;height:30px;font-size:16px}
+#nt{position:fixed;left:0;right:0;bottom:0;background:rgba(11,15,25,.95);color:#F5F3EE;padding:14px 160px 14px 28px;font:16px/1.45 "Segoe UI",system-ui;display:none;z-index:10}
+#nt b{color:#FF9A76}#nt.on{display:block}
+</style>
+</head>
+<body>
+<div class="prog" id="prog"></div>
+<div class="deck" id="deck">
+
+<section class="s ink cover" data-w="Erick" data-t="0:20" data-n="Buenos días. Somos Erick y Yuki, y les presentamos DiDistribuidores, un sistema de pedidos de comida a domicilio. Lo importante no es la comida: es que un pedido nunca se pierde ni se cobra dos veces.">
+  <div class="c1"></div><div class="c2"></div>
+  <p class="k">Sistemas Distribuidos 2027-1 · Grupo 2 · FI-UNAM</p>
+  <h1>Di<span>Distribuidores</span></h1>
+  <p class="tag">Pedidos de comida que no se pierden ni se cobran dos veces.</p>
+  <p class="who2">Erick Isaac Echeverria Goicochea · Yukioayax Canek Gabriel Hernández<br>github.com/YukiGab/sd-2027-1-didistribuidores</p>
+</section>
+
+<section class="s" data-w="Erick" data-t="1:00" data-n="El contexto. Tres actores: el cliente que pide y paga, el restaurante que publica su menú, y el repartidor que acepta y entrega. Clic en «Recorrer todo»: se encienden en cascada las partes del sistema que intervienen en cada paso. Este es el diagrama funcional.">
+  <p class="k">El contexto</p>
+  <h2>Un cliente pide, paga, y un repartidor lo entrega.</h2>
+  <div class="ctx">
+    <div class="actors">
+      <div><i>🧑</i><p><b>Cliente</b><span>Ve el menú, pide, paga y sigue su pedido con avisos.</span></p></div>
+      <div><i>🍲</i><p><b>Restaurante</b><span>Publica su menú y su zona. Tres de prueba, zonas 1, 2 y 3.</span></p></div>
+      <div><i>🛵</i><p><b>Repartidor</b><span>Ve los pedidos pagados de su zona, acepta uno y entrega con un código.</span></p></div>
+    </div>
+    <div>
+      <div class="steps" id="ctxSteps">
+        <button data-i="0"><b>PASO 1</b>Pedir</button>
+        <button data-i="1"><b>PASO 2</b>Pagar</button>
+        <button data-i="2"><b>PASO 3</b>Aceptar</button>
+        <button data-i="3"><b>PASO 4</b>Entregar</button>
+      </div>
+      <div class="chain" id="ctxChain">
+        <span data-n="app">App</span><em>→</em><span data-n="gw">Traefik</span><em>→</em><span data-n="nu">Núcleo</span><em>→</em><span data-n="re">Repartidores</span><em>·</em><span data-n="ob">Outbox</span><em>→</em><span data-n="mq">RabbitMQ</span><em>→</em><span data-n="no">Notificaciones</span>
+      </div>
+      <ul class="ctxlist" id="ctxList"></ul>
+      <div class="row" style="margin-top:6px"><button class="btn ac" id="ctxAll">▶ Recorrer todo</button><span id="ctxState"></span></div>
+    </div>
+  </div>
+</section>
+
+<section class="s soft" data-w="Yuki" data-t="0:35" data-n="El alcance. Estaba pensado para cuatro personas y somos dos, así que lo acordamos con el profesor. Dejamos fuera autenticación, GPS e historial. Sí hicimos lo que evalúa el curso: un núcleo y dos servicios, gateway, balanceo, cola de mensajes y circuit breaker.">
+  <p class="k">El alcance</p>
+  <div class="scope">
+    <div><div class="big">2</div><p style="margin-top:4px">personas. Pensado para cuatro; el alcance se acordó con el profesor.</p></div>
+    <div>
+      <p class="lab">Lo que dejamos fuera</p>
+      <ul class="lst no"><li>Autenticación y pasarela de pago real</li><li>GPS y seguimiento en tiempo real</li><li>Historial y módulo de atención</li></ul>
+      <p class="lab" style="margin-top:24px">Lo que sí</p>
+      <ul class="lst yes"><li>Un núcleo y dos servicios, cada uno con su base</li><li>Gateway, balanceo, cola de mensajes y circuit breaker</li></ul>
+    </div>
+  </div>
+</section>
+
+<section class="s" data-w="Erick" data-t="0:45" data-n="El problema: en hora pico la red falla, la app no recibe respuesta, reintenta, y el servidor procesa lo mismo otra vez. Sin protección se cobra dos veces. Con una Idempotency-Key, el reintento regresa el mismo pedido y hay un solo cobro.">
+  <p class="k">El problema</p>
+  <h2>Reintentar no debería cobrarte dos veces.</h2>
+  <div class="vs">
+    <div class="card bad"><h3>Sin protección</h3><ol><li>Pago → el servidor cobra</li><li style="color:var(--er)">La respuesta se pierde</li><li>La app reintenta</li><li>El servidor cobra otra vez</li></ol><div class="tot"><span class="big">2</span><span>cobros</span></div></div>
+    <div class="card good"><h3>Con Idempotency-Key</h3><ol><li>Pedido con clave a1f9 → cobra</li><li style="color:var(--er)">La respuesta se pierde</li><li>La app reintenta, misma clave</li><li>Regresa el mismo pedido (200)</li></ol><div class="tot"><span class="big">1</span><span>cobro</span></div></div>
+  </div>
+</section>
+
+<section class="s soft" data-w="Erick" data-t="0:40" data-n="Nuestra respuesta: consistencia sobre disponibilidad. Preferimos rechazar o retrasar con un 503 claro antes que perder, duplicar o cobrar dos veces. Estas son las cuatro garantías que probamos en cada etapa.">
+  <p class="k">Nuestra respuesta</p>
+  <h2>Mejor un 503 claro que un doble cobro.</h2>
+  <div class="gar">
+    <div><b>1</b><span>Nunca se cobra un pedido que no se confirmó.</span><small>Cobro y estado en una transacción</small></div>
+    <div><b>2</b><span>Nunca se pierde un pedido confirmado.</span><small>Outbox en la misma transacción</small></div>
+    <div><b>3</b><span>Repetir una petición devuelve el mismo pedido.</span><small>UNIQUE sobre la clave</small></div>
+    <div><b>4</b><span>La entrega se registra una sola vez.</span><small>UPDATE condicional</small></div>
+  </div>
+</section>
+
+<section class="s" data-w="Los dos" data-t="1:00" data-n="Cada quien presenta su parte. Erick: etapa 1, el monolito con la lógica de pedidos y pagos, y etapa 3, repartidores como servicio con gateway y dos copias. Yuki: la infraestructura de la etapa 1, la etapa 2 de notificaciones con RabbitMQ y la etapa 4 de resiliencia. Cada pull request lo revisó el otro.">
+  <p class="k">Cómo lo construimos</p>
+  <h2>De un monolito a un sistema distribuido, en cuatro ramas.</h2>
+  <div class="tl">
+    <div><small>01-monolito</small><b>Monolito</b><span>Una app, una base, módulos con tres capas. Evita cobros dobles.</span><span class="tagE">Erick · lógica</span> <span class="tagY">Yuki · Docker y outbox</span></div>
+    <div><small>02-separacion</small><b>Notificaciones</b><span>Servicio aparte con cola de mensajes. No pierde avisos.</span><span class="tagY">Yuki</span></div>
+    <div><small>03-separacion</small><b>Repartidores</b><span>Servicio con 2 copias detrás de un gateway. Responde ya o rechaza.</span><span class="tagE">Erick</span></div>
+    <div><small>04-resiliencia</small><b>Resiliencia</b><span>Circuit breaker, reintentos y pruebas de caídas.</span><span class="tagY">Yuki</span></div>
+  </div>
+</section>
+
+<section class="s soft" data-w="Erick" data-t="1:30" data-n="La arquitectura. Todo entra por un solo puerto, el 8080, que es Traefik: ese es el gateway. El directorio de servicios es el DNS de Docker Compose: los servicios se llaman por nombre. El balanceador también es Traefik, que reparte entre las dos copias de repartidores y saca a la que falla. Los datos: una instancia de PostgreSQL con tres bases, una por servicio.">
+  <p class="k">La arquitectura</p>
+  <div class="arq">
+    <svg viewBox="0 0 560 330" role="img" aria-label="Diagrama de arquitectura">
+      <defs><marker id="f" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" style="fill:#8e8e93;stroke:none"/></marker></defs>
+      <g class="h"><rect x="150" y="20" width="120" height="44" rx="12"/></g>
+      <rect x="10" y="20" width="90" height="44" rx="12"/><rect x="30" y="130" width="120" height="52" rx="12"/><rect x="200" y="130" width="140" height="52" rx="12"/><rect x="390" y="130" width="140" height="52" rx="12"/>
+      <rect x="200" y="235" width="140" height="42" rx="12"/><rect x="390" y="235" width="140" height="42" rx="12"/><rect x="30" y="292" width="500" height="32" rx="12" style="fill:#ECE8DF"/>
+      <g marker-end="url(#f)"><path d="M100 42 H150"/><path d="M185 64 L100 130"/><path d="M210 64 V130"/><path d="M245 64 L440 130"/><path d="M200 156 H150" stroke-dasharray="4"/><path d="M270 182 V235"/><path d="M340 256 H390"/><path d="M460 235 V182"/></g>
+      <text class="t" x="28" y="48">Cliente</text><text class="t" x="168" y="40" style="fill:#fff">Traefik</text><text x="168" y="56" style="fill:#fff;opacity:.85">:8080</text>
+      <text class="t" x="52" y="154">Repartidores</text><text class="m" x="52" y="171">2 copias</text>
+      <text class="t" x="237" y="154">Núcleo</text><text class="m" x="212" y="171">pedidos y pagos</text>
+      <text class="t" x="410" y="154">Notificaciones</text><text class="m" x="410" y="171">consumidor</text>
+      <text class="t" x="243" y="253">Outbox</text><text class="m" x="212" y="269">misma transacción</text>
+      <text class="t" x="425" y="253">RabbitMQ</text><text class="m" x="410" y="269">cola durable</text>
+      <text class="m" x="60" y="313">PostgreSQL · una base lógica por servicio</text>
+      <text class="m" x="158" y="150" style="font-size:12px">HTTP</text>
+    </svg>
+    <div class="cal">
+      <div><b>Gateway</b>Traefik, única entrada, por etiquetas de Docker</div>
+      <div><b>Directorio</b>DNS de Docker Compose, por nombre</div>
+      <div><b>Balanceo</b>Traefik reparte entre 2 copias y retira la que falla</div>
+    </div>
+  </div>
+</section>
+
+<section class="s" data-w="Erick" data-t="0:50" data-n="La idea central de la etapa 1: las garantías las da la base de datos, no el código. La idempotencia es un UNIQUE sobre la clave, y cada cambio de estado es un UPDATE con el estado de origen en el WHERE. Si dos repartidores aceptan a la vez, la base deja pasar uno y el otro recibe 409. Con cinco peticiones simultáneas: un solo pedido y un solo cobro.">
+  <p class="k">Cómo evitamos el doble cobro</p>
+  <h2>Lo decide la base de datos, no el código.</h2>
+  <div class="row2">
+    <div class="code mono"><span class="d">-- gana el primero; el otro recibe 409</span><br><span class="a">UPDATE</span> pedidos<br><span class="a">SET</span> estado = 'ASIGNADO', repartidor_id = …<br><span class="a">WHERE</span> estado = 'PAGADO'<br>&nbsp;&nbsp;<span class="a">AND</span> repartidor_id <span class="a">IS NULL</span>;</div>
+    <div><div class="big stat">5 → 1</div><p class="capt">cinco peticiones simultáneas con la misma clave dejan un solo pedido y un solo cobro.</p></div>
+  </div>
+</section>
+
+<section class="s soft" data-w="Yuki" data-t="1:00" data-n="Etapa 2, los avisos. Cuando el pedido cambia de estado, el evento se guarda en el outbox en la misma transacción, así el pedido ya está confirmado y nadie espera al aviso. Un publicador lo manda a RabbitMQ y el consumidor lo guarda y solo después confirma. Si el mensaje llega repetido, se ignora. Si notificaciones está apagado, los avisos esperan y llegan una sola vez.">
+  <p class="k">Avisos sin perder nada</p>
+  <h2>El pedido no espera al aviso.</h2>
+  <div class="flow">
+    <div><b>Pedido</b>Cambia de estado y guarda el evento en la misma transacción.</div>
+    <div><b>Publicador</b>Lo manda a RabbitMQ y solo lo marca cuando el broker confirma.</div>
+    <div><b>RabbitMQ</b>Cola durable y mensajes persistentes. Los inválidos van a la DLQ.</div>
+    <div><b>Consumidor</b>Guarda el aviso y después confirma. Un evento repetido se ignora.</div>
+  </div>
+  <div class="bottom"><span class="big">0</span><span>avisos perdidos con notificaciones apagado: esperan en la cola y llegan una sola vez.</span></div>
+</section>
+
+<section class="s" data-w="Yuki" data-t="1:10" data-n="Etapa 4. Cuando repartidores falla seguido, cada petición esperaba su tiempo límite y la falla se volvía lentitud general. Por eso un circuit breaker hecho a mano. Clic: tirar repartidores y aceptar varias veces. Con 3 fallos se abre y contesta 503 al instante. A los 10 s deja pasar una llamada de prueba; con repartidores arriba, se cierra solo.">
+  <p class="k">Cuando algo falla seguido</p>
+  <h2>Un circuit breaker que corta la espera.</h2>
+  <div class="cb">
+    <div>
+      <div class="sm"><span class="pill p-ok cur" id="smC">Cerrado</span><span class="ar">3 fallos<br>→</span><span class="pill p-er" id="smA">Abierto</span><span class="ar">10 s<br>→</span><span class="pill p-wr" id="smS">Semiabierto</span></div>
+      <div class="lab">Fallos seguidos</div>
+      <div class="meter"><i id="m1"></i><i id="m2"></i><i id="m3"></i></div>
+      <div class="row" style="margin-top:6px"><button class="btn ac" id="cbCall">▶ Aceptar pedido</button><button class="btn ghost" id="cbDown">Tirar repartidores</button><button class="btn ghost" id="cbReset">Reiniciar</button></div>
+      <p class="cnt" id="cbCnt" style="margin-top:12px"></p>
+      <p style="font-size:17px;margin-top:6px">Además: tiempo límite de 3 s y un solo reintento, solo cuando es seguro.</p>
+    </div>
+    <div class="cbl" id="cbLog"></div>
+  </div>
+</section>
+
+<section class="s soft" data-w="Erick" data-t="0:35" data-n="Lo que falta, con honestidad: PostgreSQL y Traefik son puntos únicos de falla, las llamadas internas no usan los healthchecks y no hay autenticación. Haríamos distinto: probar con Docker real desde el inicio y automatizar las pruebas. Y justo eso: le paso a Yuki, que va a mostrar cómo lo probamos.">
+  <p class="k">Qué falta y qué haríamos distinto</p>
+  <h2>Sabemos dónde están los límites.</h2>
+  <div class="two">
+    <div><p class="lab">Qué falta</p><ul class="lst"><li>PostgreSQL y Traefik son puntos únicos de falla</li><li>Las llamadas internas no usan los healthchecks</li><li>Sin autenticación</li><li>Los mensajes de la DLQ no se reprocesan</li></ul></div>
+    <div><p class="lab">Qué haríamos distinto</p><ul class="lst"><li>Probar con Docker real desde el primer commit</li><li>Automatizar las pruebas desde el inicio</li><li>Una interfaz mínima desde la etapa 1</li></ul></div>
+  </div>
+</section>
+
+<section class="s" data-w="Yuki" data-t="1:00" data-n="Cómo lo probamos. 48 pruebas, todas contra Docker real y por el gateway: 14 de la etapa 1, 7 de la 2, 10 de la 3, 8 de la 4 y 9 de regresión al final. Lo más interesante: con repartidores apagado, en Windows, cada intento tardaba 8 segundos, porque el DNS de Docker tardaba 4 s en decir que el nombre no existe y el reintento lo duplicaba. Le pusimos su propio límite de 1 s.">
+  <p class="k">Cómo lo probamos</p>
+  <h2>48 pruebas, todas contra Docker real.</h2>
+  <div class="tests">
+    <div>
+      <div class="tnum">
+        <div><b>14</b><span>Etapa 1</span></div><div><b>7</b><span>Etapa 2</span></div><div><b>10</b><span>Etapa 3</span></div><div><b>8</b><span>Etapa 4</span></div><div><b>9</b><span>Regresión</span></div>
+      </div>
+      <ul class="lst" style="margin-top:16px"><li>Peticiones repetidas y simultáneas</li><li>Caída de cada servicio, de la cola y del gateway</li><li>Reinicio de PostgreSQL y del núcleo a la mitad</li></ul>
+    </div>
+    <div>
+      <p class="lab">Lo que encontramos al probar</p>
+      <p style="font-size:19px;color:var(--ink)">El DNS de Docker en Windows tardaba 4 s en rendirse, y el reintento lo duplicaba.</p>
+      <div class="ba"><div class="big old">8 s</div><div class="ar">→</div><div class="big">1 s</div></div>
+      <p style="font-size:17px;margin-top:8px">por intento con repartidores apagado; 7 ms con el circuito abierto.</p>
+    </div>
+  </div>
+</section>
+
+<section class="s ink" data-w="Yuki" data-t="3:30" data-n="El video de las pruebas. Espacio: pausa o sigue. A / D o ← →: 5 s atrás o adelante. Para cambiar de diapositiva aquí: Re Pág / Av Pág o los botones de abajo. Capítulos a la izquierda.">
+  <p class="k" style="color:#FF9A76">Las pruebas, funcionando</p>
+  <h2 style="font-size:42px;color:#fff">Así se ve cuando algo se cae.</h2>
+  <div class="vid">
+    <div>
+      <div class="chap" id="chap"></div>
+      <p class="keys"><b>Espacio</b> pausa · <b>A / D</b> o <b>← →</b> 5 s<br><b>Re Pág / Av Pág</b> cambia de diapositiva</p>
+    </div>
+    <div class="screen">
+      <video id="tvV" preload="metadata" src="videopruebas.mp4"></video>
+      <div class="vctl"><span id="tvTime">00:00 / 00:00</span><div class="vbar" id="vbarBox"><i id="vbar"></i></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="s ink" data-w="Los dos" data-t="0:20" data-n="Cierre. Gracias, ¿preguntas?">
+  <p class="k" style="color:#FF9A76">En resumen</p>
+  <h2 style="color:#fff;font-size:64px">Gracias. ¿Preguntas?</h2>
+  <div class="qa">
+    <div><b>Gateway y balanceo</b><span>Traefik: única entrada en :8080 y reparto entre las 2 copias de repartidores.</span></div>
+    <div><b>Directorio</b><span>El DNS de Docker Compose: cada servicio se encuentra por su nombre.</span></div>
+    <div><b>Si algo falla</b><span>Outbox y cola durable para los avisos; tiempo límite, 503 y circuit breaker hacia repartidores.</span></div>
+  </div>
+  <p class="hint">Código, reporte, pruebas y bitácoras: github.com/YukiGab/sd-2027-1-didistribuidores</p>
+</section>
+
+</div>
+<div class="nav"><span id="pos"></span><button id="bPrev" title="Anterior">‹</button><button id="bNext" title="Siguiente">›</button></div>
+<div id="nt"></div>
+<script>
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const li=(ul,html,n)=>{const e=document.createElement("li");e.innerHTML=html;if(n)e.dataset.n=n;e.className="in";ul.appendChild(e);return e;};
+const S=$$(".s"),D=$("#deck"),NT=$("#nt"),V=$("#tvV");let i=0,t0=null;
+S.forEach(s=>{const w=s.dataset.w,c=w==="Erick"?"e":w==="Yuki"?"y":"d",b=document.createElement("div");b.className="who "+c;b.innerHTML=`<i></i>Habla: ${w}`;s.appendChild(b);});
+function fit(){const s=Math.min(innerWidth/1280,innerHeight/720);D.style.transform=`translate(-50%,-50%) scale(${s})`;}
+function mmss(sec){sec=Math.max(0,Math.floor(sec||0));return String(Math.floor(sec/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0");}
+const onVideo=()=>!!S[i].querySelector("#tvV");
+function show(n){i=Math.max(0,Math.min(S.length-1,n));S.forEach((e,k)=>e.classList.toggle("on",k===i));
+ $("#prog").style.width=((i+1)/S.length*100)+"%";$("#pos").textContent=(i+1)+" / "+S.length;history.replaceState(null,"","#"+(i+1));
+ const e=S[i];NT.innerHTML=`<b>${i+1}/${S.length}</b> · ${e.dataset.w} · ${e.dataset.t} · tiempo total <span id="el">${t0?mmss((Date.now()-t0)/1000):"00:00"}</span><br>${e.dataset.n}`;
+ if(!onVideo())V.pause();}
+function go(n){if(!t0&&n>0)t0=Date.now();show(n);}
+const seek=d=>{V.currentTime=Math.min(Math.max(0,V.currentTime+d),V.duration||0);};
+addEventListener("keydown",e=>{
+ if(onVideo()){
+  if(e.key===" "){e.preventDefault();V.paused?V.play():V.pause();return;}
+  if(e.key==="ArrowLeft"||e.key==="a"||e.key==="A"){e.preventDefault();seek(-5);return;}
+  if(e.key==="ArrowRight"||e.key==="d"||e.key==="D"){e.preventDefault();seek(5);return;}
+ }
+ if(e.key===" "){e.preventDefault();return;}
+ if(["ArrowRight","PageDown"].includes(e.key)){e.preventDefault();go(i+1);}
+ else if(["ArrowLeft","PageUp"].includes(e.key)){e.preventDefault();go(i-1);}
+ else if(e.key==="Home")go(0);else if(e.key==="End")go(S.length-1);
+ else if(e.key==="n"||e.key==="N")NT.classList.toggle("on");
+ else if(e.key==="f"||e.key==="F"){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();}});
+document.addEventListener("click",e=>{const b=e.target.closest("button");if(b)setTimeout(()=>b.blur(),0);});
+$("#bPrev").onclick=()=>go(i-1);$("#bNext").onclick=()=>go(i+1);
+setInterval(()=>{const el=$("#el");if(el&&t0)el.textContent=mmss((Date.now()-t0)/1000);},1000);
+
+const CTX=[
+ {n:["app","gw","nu"],l:["El cliente elige platillos y pide.","La petición entra por Traefik, el gateway.","El núcleo crea el pedido; la Idempotency-Key evita duplicados."],s:["PENDIENTE_PAGO","p-mu"]},
+ {n:["app","gw","nu","ob","mq","no"],l:["El cliente paga.","Cobro y cambio de estado van en una sola transacción.","Ahí mismo se guarda el evento en el outbox.","RabbitMQ lo lleva a notificaciones: «Recibimos tu pago»."],s:["PAGADO","p-wr"]},
+ {n:["app","gw","nu","re","ob","mq","no"],l:["Un repartidor de la zona acepta.","El núcleo le pregunta a repartidores por HTTP, con tiempo límite.","Un UPDATE condicional decide quién gana.","Llega el aviso de repartidor asignado."],s:["ASIGNADO","p-wr"]},
+ {n:["app","gw","nu","ob","mq","no"],l:["El repartidor confirma con el código de entrega.","Se registra una sola vez, aunque confirme dos veces.","Llega el último aviso: entregado."],s:["ENTREGADO","p-ok"]}];
+let ctxTok=0;
+async function ctxPlay(k){const tok=++ctxTok,c=CTX[k];
+ $$("#ctxSteps button").forEach(x=>x.classList.toggle("sel",+x.dataset.i===k));
+ $$("#ctxChain span").forEach(sp=>sp.classList.remove("lit"));$("#ctxList").innerHTML="";$("#ctxState").innerHTML="";
+ for(const sp of $$("#ctxChain span")){if(tok!==ctxTok)return;if(c.n.includes(sp.dataset.n)){sp.classList.add("lit");await sleep(220);}}
+ for(let j=0;j<c.l.length;j++){if(tok!==ctxTok)return;li($("#ctxList"),c.l[j],j+1);await sleep(450);}
+ if(tok===ctxTok)$("#ctxState").innerHTML=`Estado: <span class="pill ${c.s[1]}">${c.s[0]}</span>`;}
+$$("#ctxSteps button").forEach(b=>b.onclick=()=>ctxPlay(+b.dataset.i));
+$("#ctxAll").onclick=async()=>{const tok=ctxTok+1;for(let k=0;k<4;k++){await ctxPlay(k);if(ctxTok!==tok+k)return;await sleep(1300);}};
+
+const CB={st:"C",f:0,down:false,open:0,busy:false};
+function cbPaint(){$("#smC").classList.toggle("cur",CB.st==="C");$("#smA").classList.toggle("cur",CB.st==="A");$("#smS").classList.toggle("cur",CB.st==="S");
+ [1,2,3].forEach(k=>$("#m"+k).classList.toggle("on",CB.f>=k));$("#cbDown").textContent=CB.down?"Levantar repartidores":"Tirar repartidores";}
+function cbLog(t){const L=$("#cbLog"),d=document.createElement("div");d.className="in";d.innerHTML=t;L.prepend(d);while(L.children.length>12)L.lastChild.remove();}
+setInterval(()=>{if(CB.st==="A"){const r=Math.max(0,10-Math.floor((Date.now()-CB.open)/1000));
+ $("#cbCnt").textContent=r>0?`Circuito abierto: deja pasar una llamada de prueba en ${r} s`:"";
+ if(r===0){CB.st="S";cbPaint();cbLog(`<span style="color:#946800">ABIERTO → SEMIABIERTO</span> (pasó la pausa)`);}}
+ else if(CB.st==="S")$("#cbCnt").textContent="Semiabierto: la siguiente llamada decide";else $("#cbCnt").textContent="";},250);
+$("#cbCall").onclick=async()=>{if(CB.busy)return;
+ if(CB.st==="A"){cbLog(`aceptar → <b style="color:var(--er)">503 en 7 ms</b> (ni siquiera llama)`);return;}
+ CB.busy=true;const test=CB.st==="S";cbLog(test?"llamada de prueba a repartidores…":"aceptar → llamando a repartidores…");
+ await sleep(CB.down?1000:120);
+ if(!CB.down){cbLog(`<b style="color:var(--ok)">200 en 30 ms</b>`);if(test)cbLog(`<span style="color:var(--ok)">SEMIABIERTO → CERRADO</span> (la prueba salió bien)`);CB.st="C";CB.f=0;}
+ else if(test){CB.st="A";CB.open=Date.now();cbLog(`<b style="color:var(--er)">503</b> · la prueba falló → ABIERTO otra vez`);}
+ else{CB.f++;cbLog(`<b style="color:var(--er)">503 en 1.0 s</b> (fallo ${CB.f} de 3)`);if(CB.f>=3){CB.st="A";CB.open=Date.now();cbLog(`<span style="color:var(--er)">CERRADO → ABIERTO</span> (3 fallos seguidos)`);}}
+ CB.busy=false;cbPaint();};
+$("#cbDown").onclick=()=>{CB.down=!CB.down;cbLog(CB.down?"docker compose stop repartidores":"docker compose start repartidores");cbPaint();};
+$("#cbReset").onclick=()=>{Object.assign(CB,{st:"C",f:0,down:false,open:0,busy:false});$("#cbLog").innerHTML="";cbPaint();};
+cbPaint();
+
+const CH=[["Preparar el sistema",0],["Etapas 1–3 · regresión",44],["Etapa 2 · notificaciones",86],["Etapa 2 · RabbitMQ caído",146],["Etapa 3 · cae una copia",170],["Etapa 4 · resiliencia",188],["App de escritorio",302],["Panel web",332]];
+$("#chap").innerHTML=CH.map(([n,t],k)=>`<button data-k="${k}">${n}<span>${mmss(t)}</span></button>`).join("");
+$$("#chap button").forEach(b=>b.onclick=()=>{V.currentTime=CH[+b.dataset.k][1];V.play();});
+V.addEventListener("timeupdate",()=>{const d=V.duration||0;$("#tvTime").textContent=mmss(V.currentTime)+" / "+mmss(d);$("#vbar").style.width=(d?V.currentTime/d*100:0)+"%";
+ let k=0;CH.forEach(([,t],j)=>{if(V.currentTime>=t-0.5)k=j;});$$("#chap button").forEach((b,j)=>b.classList.toggle("sel",j===k));});
+V.addEventListener("click",()=>V.paused?V.play():V.pause());
+$("#vbarBox").addEventListener("click",e=>{const r=e.currentTarget.getBoundingClientRect();if(V.duration)V.currentTime=(e.clientX-r.left)/r.width*V.duration;});
+
+addEventListener("resize",fit);fit();show((parseInt(location.hash.slice(1))||1)-1);
+</script>
+</body>
+</html>
