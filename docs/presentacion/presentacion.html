@@ -11,8 +11,8 @@
 html,body{height:100%;background:#0b0f19;overflow:hidden}
 body{font-family:"Segoe UI Variable Text","Segoe UI",Inter,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
 .deck{position:fixed;left:50%;top:50%;width:1280px;height:720px;transform-origin:center;overflow:hidden;background:var(--bg)}
-.s{position:absolute;inset:0;padding:60px 92px 64px;opacity:0;visibility:hidden;transition:opacity .35s ease;background:var(--bg);display:flex;flex-direction:column}
-.s.on{opacity:1;visibility:visible}
+.s{position:absolute;inset:0;padding:60px 92px 64px;opacity:0;visibility:hidden;transition:opacity .7s ease-in-out;background:var(--bg);display:flex;flex-direction:column}
+.s.on{opacity:1;visibility:visible;z-index:2}.s.prev{opacity:1;visibility:visible;z-index:1;transition:none}
 .s.ink{background:var(--ink);color:#F5F3EE}.s.soft{background:var(--soft)}
 h1,h2,.big{font-family:"Segoe UI Variable Display","Segoe UI",Inter,system-ui,sans-serif;letter-spacing:-.025em}
 h1{font-size:92px;line-height:1;font-weight:800}
@@ -77,21 +77,31 @@ button{font:inherit;cursor:pointer;border:0}
 .vs ol{padding-left:20px;font:16px/1.75 "Cascadia Code",Consolas,monospace;color:var(--ink)}
 .tot{display:flex;align-items:baseline;gap:10px;border-top:1px solid var(--li);padding-top:8px;margin-top:10px}
 .tot .big{font-size:54px}.tot span{font-size:16px;color:var(--mu)}
+.vs.pb{margin-top:18px;flex:1}.vs.pb .card{display:flex;flex-direction:column}.vs.pb .sub{font-size:15px;margin:-6px 0 10px}.vs.pb ol{list-style:none;padding:0;min-height:200px}.vs.pb .tot{margin-top:auto}.vs.pb li.x{color:var(--er)}.vs.pb li.r{font-weight:700}
 .bad .big{color:var(--er)}.good .big{color:var(--ok)}
 .gar{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:40px}
 .gar div{background:var(--card);border-radius:20px;padding:24px;min-height:220px;display:flex;flex-direction:column}
 .gar b{font-size:52px;color:var(--ac);line-height:1}
 .gar span{font-size:21px;font-weight:600;margin-top:auto;line-height:1.3}
 .gar small{font-size:14px;color:var(--mu);margin-top:8px;display:block}
-.tl{display:grid;grid-template-columns:repeat(4,1fr);margin-top:56px;position:relative}
+.tl{display:grid;grid-template-columns:repeat(4,1fr);margin-top:44px;position:relative}
 .tl:before{content:"";position:absolute;left:0;right:0;top:15px;height:2px;background:var(--li)}
-.tl div{position:relative;padding-top:48px;padding-right:22px}
+.tl div{position:relative;padding-top:40px;padding-right:18px;padding-bottom:12px}
 .tl div:before{content:"";position:absolute;top:6px;left:0;width:20px;height:20px;border-radius:50%;background:var(--ac)}
 .tl small{display:block;font-size:13px;color:var(--ac);font-weight:700;letter-spacing:.06em}
-.tl b{display:block;font-size:28px;letter-spacing:-.02em;margin:2px 0 8px}
-.tl span{font-size:18px;color:var(--mu);line-height:1.4;display:block}
-.tl span.tagE,.tl span.tagY{display:inline-block;font-size:13px;color:inherit}
+.tl b{display:block;font-size:25px;letter-spacing:-.02em;margin:2px 0 6px}
+.tl span{font-size:16px;color:var(--mu);line-height:1.4;display:block}
+.tl span.tagE,.tl span.tagY{display:inline-block;font-size:12px;color:inherit;margin-top:8px;margin-right:4px}
 .tl span.tagE{color:#14213D}.tl span.tagY{color:#B23A17}
+.tl div{cursor:pointer;border-radius:16px;padding-left:10px;margin-left:-10px;transition:background .3s}
+.tl div:hover{background:rgba(20,33,61,.04)}
+.tl div.sel{background:var(--card)}
+.tl div.sel:before{background:var(--ink);box-shadow:0 0 0 6px rgba(228,87,46,.25)}
+.tdet2{display:grid;grid-template-columns:1.3fr 1fr;gap:36px;margin-top:34px;background:var(--card);border-radius:20px;padding:18px 24px;min-height:0}
+.tdet2 h3{font-size:22px;letter-spacing:-.02em;line-height:1.2}
+.tdet2 p{font-size:16px;margin-top:6px}
+.tdet2 .kv div{display:grid;grid-template-columns:105px 1fr;padding:7px 0;border-top:1px solid var(--li);font-size:15px}
+.tdet2 .kv div:first-child{border:0}.tdet2 .kv b{color:var(--mu);font-weight:600}
 .arq{display:grid;grid-template-columns:1.8fr .85fr;gap:44px;align-items:center;flex:1}
 .arq svg{width:100%}
 .arq svg text{font:14px "Segoe UI",system-ui,sans-serif;fill:#14213D}.arq svg .m{fill:#5B6475}.arq svg .t{font-weight:600}
@@ -99,8 +109,8 @@ button{font:inherit;cursor:pointer;border:0}
 .arq svg path{stroke:#8E8E93;fill:none;stroke-width:1.6}
 .cal div{padding:14px 0;border-top:1px solid var(--li);font-size:21px;line-height:1.35;color:var(--mu)}.cal div:first-child{border:0}
 .cal b{display:block;color:var(--ink);font-size:23px}
-.row2{display:grid;grid-template-columns:1.2fr 1fr;gap:56px;align-items:end;flex:1}
-.code{background:var(--ink);color:#F5F3EE;border-radius:18px;padding:26px 30px;font-size:21px;line-height:1.6}
+.row2{display:grid;grid-template-columns:1.25fr 1fr;gap:56px;align-items:center;flex:1;padding-bottom:30px}
+.code{background:var(--ink);color:#F5F3EE;border-radius:18px;padding:28px 32px;font-size:19px;line-height:1.7;white-space:nowrap}
 .code .a{color:#FF9A76}.code .d{color:#8C96AA}
 .stat{font-size:150px}.capt{font-size:21px;color:var(--mu);margin-top:10px;max-width:420px}
 .flow{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:40px;counter-reset:n}
@@ -184,7 +194,7 @@ button{font:inherit;cursor:pointer;border:0}
   </div>
 </section>
 
-<section class="s soft" data-w="Yuki" data-t="0:35" data-n="El alcance. Estaba pensado para cuatro personas y somos dos, así que lo acordamos con el profesor. Dejamos fuera autenticación, GPS e historial. Sí hicimos lo que evalúa el curso: un núcleo y dos servicios, gateway, balanceo, cola de mensajes y circuit breaker.">
+<section class="s soft" data-w="Erick" data-t="0:35" data-n="El alcance. Estaba pensado para cuatro personas y somos dos, así que lo acordamos con el profesor. Dejamos fuera autenticación, GPS e historial. Sí hicimos lo que evalúa el curso: un núcleo y dos servicios, gateway, balanceo, cola de mensajes y circuit breaker.">
   <p class="k">El alcance</p>
   <div class="scope">
     <div><div class="big">2</div><p style="margin-top:4px">personas. Pensado para cuatro; el alcance se acordó con el profesor.</p></div>
@@ -200,9 +210,10 @@ button{font:inherit;cursor:pointer;border:0}
 <section class="s" data-w="Erick" data-t="0:45" data-n="El problema: en hora pico la red falla, la app no recibe respuesta, reintenta, y el servidor procesa lo mismo otra vez. Sin protección se cobra dos veces. Con una Idempotency-Key, el reintento regresa el mismo pedido y hay un solo cobro.">
   <p class="k">El problema</p>
   <h2>Reintentar no debería cobrarte dos veces.</h2>
-  <div class="vs">
-    <div class="card bad"><h3>Sin protección</h3><ol><li>Pago → el servidor cobra</li><li style="color:var(--er)">La respuesta se pierde</li><li>La app reintenta</li><li>El servidor cobra otra vez</li></ol><div class="tot"><span class="big">2</span><span>cobros</span></div></div>
-    <div class="card good"><h3>Con Idempotency-Key</h3><ol><li>Pedido con clave a1f9 → cobra</li><li style="color:var(--er)">La respuesta se pierde</li><li>La app reintenta, misma clave</li><li>Regresa el mismo pedido (200)</li></ol><div class="tot"><span class="big">1</span><span>cobro</span></div></div>
+  <div class="row" style="margin-top:22px"><button class="btn ac" id="pbGo">▶ Pagar (la red falla y la app reintenta)</button><button class="btn ghost" id="pbRe">Reiniciar</button></div>
+  <div class="vs pb">
+    <div class="card bad"><h3>Sin protección</h3><p class="sub">El servidor no sabe que es el mismo intento.</p><ol id="pbA"></ol><div class="tot"><span class="big" id="pbNA">0</span><span>cobros</span></div></div>
+    <div class="card good"><h3>Con Idempotency-Key</h3><p class="sub">Cada intento manda la misma clave.</p><ol id="pbB"></ol><div class="tot"><span class="big" id="pbNB">0</span><span>cobros</span></div></div>
   </div>
 </section>
 
@@ -219,13 +230,14 @@ button{font:inherit;cursor:pointer;border:0}
 
 <section class="s" data-w="Los dos" data-t="1:00" data-n="Cada quien presenta su parte. Erick: etapa 1, el monolito con la lógica de pedidos y pagos, y etapa 3, repartidores como servicio con gateway y dos copias. Yuki: la infraestructura de la etapa 1, la etapa 2 de notificaciones con RabbitMQ y la etapa 4 de resiliencia. Cada pull request lo revisó el otro.">
   <p class="k">Cómo lo construimos</p>
-  <h2>De un monolito a un sistema distribuido, en cuatro ramas.</h2>
+  <h2 style="font-size:40px;max-width:none">De un monolito a un sistema distribuido, en cuatro ramas.</h2>
   <div class="tl">
-    <div><small>01-monolito</small><b>Monolito</b><span>Una app, una base, módulos con tres capas. Evita cobros dobles.</span><span class="tagE">Erick · lógica</span> <span class="tagY">Yuki · Docker y outbox</span></div>
-    <div><small>02-separacion</small><b>Notificaciones</b><span>Servicio aparte con cola de mensajes. No pierde avisos.</span><span class="tagY">Yuki</span></div>
-    <div><small>03-separacion</small><b>Repartidores</b><span>Servicio con 2 copias detrás de un gateway. Responde ya o rechaza.</span><span class="tagE">Erick</span></div>
-    <div><small>04-resiliencia</small><b>Resiliencia</b><span>Circuit breaker, reintentos y pruebas de caídas.</span><span class="tagY">Yuki</span></div>
+    <div data-i="0"><small>01-monolito</small><b>Monolito</b><span>Una app, una base, módulos con tres capas. Evita cobros dobles.</span><span class="tagE">Erick · lógica</span><span class="tagY">Yuki · Docker</span></div>
+    <div data-i="1"><small>02-separacion</small><b>Notificaciones</b><span>Servicio aparte con cola de mensajes. No pierde avisos.</span><span class="tagY">Yuki</span></div>
+    <div data-i="2"><small>03-separacion</small><b>Repartidores</b><span>Servicio con 2 copias detrás de un gateway. Responde ya o rechaza.</span><span class="tagE">Erick</span></div>
+    <div data-i="3"><small>04-resiliencia</small><b>Resiliencia</b><span>Circuit breaker, reintentos y pruebas de caídas.</span><span class="tagY">Yuki</span></div>
   </div>
+  <div class="tdet2 in" id="stDet"><div><h3 id="stQ"></h3><p id="stD"></p></div><div class="kv" id="stKV"></div></div>
 </section>
 
 <section class="s soft" data-w="Erick" data-t="1:30" data-n="La arquitectura. Todo entra por un solo puerto, el 8080, que es Traefik: ese es el gateway. El directorio de servicios es el DNS de Docker Compose: los servicios se llaman por nombre. El balanceador también es Traefik, que reparte entre las dos copias de repartidores y saca a la que falla. Los datos: una instancia de PostgreSQL con tres bases, una por servicio.">
@@ -319,13 +331,13 @@ button{font:inherit;cursor:pointer;border:0}
   </div>
 </section>
 
-<section class="s ink" data-w="Yuki" data-t="3:30" data-n="El video de las pruebas. Espacio: pausa o sigue. A / D o ← →: 5 s atrás o adelante. Para cambiar de diapositiva aquí: Re Pág / Av Pág o los botones de abajo. Capítulos a la izquierda.">
+<section class="s ink" data-w="Yuki" data-t="3:00" data-n="El video de las pruebas. Espacio: pausa o sigue. A: 5 s atrás. D: 5 s adelante. Capítulos a la izquierda.">
   <p class="k" style="color:#FF9A76">Las pruebas, funcionando</p>
   <h2 style="font-size:42px;color:#fff">Así se ve cuando algo se cae.</h2>
   <div class="vid">
     <div>
       <div class="chap" id="chap"></div>
-      <p class="keys"><b>Espacio</b> pausa · <b>A / D</b> o <b>← →</b> 5 s<br><b>Re Pág / Av Pág</b> cambia de diapositiva</p>
+      <p class="keys"><b>Espacio</b> pausa · <b>A</b> retrocede 5 s · <b>D</b> adelanta 5 s</p>
     </div>
     <div class="screen">
       <video id="tvV" preload="metadata" src="videopruebas.mp4"></video>
@@ -334,7 +346,7 @@ button{font:inherit;cursor:pointer;border:0}
   </div>
 </section>
 
-<section class="s ink" data-w="Los dos" data-t="0:20" data-n="Cierre. Gracias, ¿preguntas?">
+<section class="s ink" data-w="Erick" data-t="0:30" data-n="Cierre: repasar las tres respuestas clave (gateway y balanceo, directorio, qué pasa si algo falla). Gracias, ¿preguntas?">
   <p class="k" style="color:#FF9A76">En resumen</p>
   <h2 style="color:#fff;font-size:64px">Gracias. ¿Preguntas?</h2>
   <div class="qa">
@@ -357,7 +369,7 @@ S.forEach(s=>{const w=s.dataset.w,c=w==="Erick"?"e":w==="Yuki"?"y":"d",b=documen
 function fit(){const s=Math.min(innerWidth/1280,innerHeight/720);D.style.transform=`translate(-50%,-50%) scale(${s})`;}
 function mmss(sec){sec=Math.max(0,Math.floor(sec||0));return String(Math.floor(sec/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0");}
 const onVideo=()=>!!S[i].querySelector("#tvV");
-function show(n){i=Math.max(0,Math.min(S.length-1,n));S.forEach((e,k)=>e.classList.toggle("on",k===i));
+let prevT=null;function show(n){const old=i;i=Math.max(0,Math.min(S.length-1,n));if(old!==i){S.forEach(e=>e.classList.remove("prev"));S[old].classList.add("prev");clearTimeout(prevT);prevT=setTimeout(()=>S.forEach(e=>e.classList.remove("prev")),750);}S.forEach((e,k)=>e.classList.toggle("on",k===i));
  $("#prog").style.width=((i+1)/S.length*100)+"%";$("#pos").textContent=(i+1)+" / "+S.length;history.replaceState(null,"","#"+(i+1));
  const e=S[i];NT.innerHTML=`<b>${i+1}/${S.length}</b> · ${e.dataset.w} · ${e.dataset.t} · tiempo total <span id="el">${t0?mmss((Date.now()-t0)/1000):"00:00"}</span><br>${e.dataset.n}`;
  if(!onVideo())V.pause();}
@@ -366,8 +378,8 @@ const seek=d=>{V.currentTime=Math.min(Math.max(0,V.currentTime+d),V.duration||0)
 addEventListener("keydown",e=>{
  if(onVideo()){
   if(e.key===" "){e.preventDefault();V.paused?V.play():V.pause();return;}
-  if(e.key==="ArrowLeft"||e.key==="a"||e.key==="A"){e.preventDefault();seek(-5);return;}
-  if(e.key==="ArrowRight"||e.key==="d"||e.key==="D"){e.preventDefault();seek(5);return;}
+  if(e.key==="a"||e.key==="A"){e.preventDefault();seek(-5);return;}
+  if(e.key==="d"||e.key==="D"){e.preventDefault();seek(5);return;}
  }
  if(e.key===" "){e.preventDefault();return;}
  if(["ArrowRight","PageDown"].includes(e.key)){e.preventDefault();go(i+1);}
@@ -394,6 +406,30 @@ async function ctxPlay(k){const tok=++ctxTok,c=CTX[k];
 $$("#ctxSteps button").forEach(b=>b.onclick=()=>ctxPlay(+b.dataset.i));
 $("#ctxAll").onclick=async()=>{const tok=ctxTok+1;for(let k=0;k<4;k++){await ctxPlay(k);if(ctxTok!==tok+k)return;await sleep(1300);}};
 
+
+/* ---------- 4 problema ---------- */
+const PA=[["→ POST /pago",""],["servidor cobra $190 ✓","",1],["✕ la respuesta se pierde","x"],["→ la app reintenta POST /pago",""],["servidor cobra $190 otra vez ✓","",1],["= el cliente pagó dos veces","x r"]];
+const PB=[["→ POST /pedidos clave=a1f9",""],["crea el pedido y cobra ✓","",1],["✕ la respuesta se pierde","x"],["→ la app reintenta clave=a1f9",""],["misma clave → mismo pedido (200)",""],["= un solo cobro","r"]];
+let pbTok=0;
+function pbReset(){pbTok++;$("#pbA").innerHTML="";$("#pbB").innerHTML="";$("#pbNA").textContent="0";$("#pbNB").textContent="0";}
+$("#pbGo").onclick=async()=>{pbReset();const tok=pbTok;let a=0,b=0;
+ for(let k=0;k<PA.length;k++){if(tok!==pbTok)return;
+  const ea=li($("#pbA"),PA[k][0]);ea.className="in "+PA[k][1];if(PA[k][2])$("#pbNA").textContent=++a;
+  const eb=li($("#pbB"),PB[k][0]);eb.className="in "+PB[k][1];if(PB[k][2])$("#pbNB").textContent=++b;
+  if(k===5)eb.style.color="var(--ok)";
+  await sleep(700);}};
+$("#pbRe").onclick=pbReset;
+
+/* ---------- 6 etapas ---------- */
+const ST=[
+ {q:"¿Cómo evitamos cobros dobles y pedidos duplicados?",d:"Una sola app y una sola base, en módulos de tres capas. La base decide con UNIQUE y UPDATE condicional, y cada cambio de estado deja un evento en el outbox.",kv:[["Quién","Erick (lógica) · Yuki (Docker, semilla y outbox)"],["Prueba clave","5 peticiones iguales → 1 pedido"]]},
+ {q:"¿Qué pasa con los avisos si algo se cae?",d:"Notificaciones sale del núcleo con su propio proceso y su base. Un publicador manda el outbox a RabbitMQ y el consumidor confirma hasta después de guardar.",kv:[["Quién","Yuki"],["Prueba clave","Notificaciones apagado: los avisos llegan al volver"]]},
+ {q:"¿Qué pasa con una llamada que necesita respuesta ya?",d:"Repartidores sale como servicio con dos copias detrás de Traefik. El núcleo lo consulta por HTTP con tiempo límite; si no responde, 503 y no cambia nada.",kv:[["Quién","Erick"],["Prueba clave","Cae una copia: diez 200, nadie lo nota"]]},
+ {q:"¿Qué pasa cuando una pieza falla seguido?",d:"Circuit breaker hecho a mano, reintento seguro, huella de la petición (422 si reutilizan la clave) y reconexión sola a la base.",kv:[["Quién","Yuki"],["Prueba clave","3 s por intento → 7 ms con el circuito abierto"]]}];
+function stage(k){const s=ST[k];$$(".tl div[data-i]").forEach(d=>d.classList.toggle("sel",+d.dataset.i===k));
+ const box=$("#stDet");box.classList.remove("in");void box.offsetWidth;box.classList.add("in");
+ $("#stQ").textContent=s.q;$("#stD").textContent=s.d;$("#stKV").innerHTML=s.kv.map(([a,b])=>`<div><b>${a}</b><span>${b}</span></div>`).join("");}
+$$(".tl div[data-i]").forEach(d=>d.onclick=()=>stage(+d.dataset.i));stage(0);
 const CB={st:"C",f:0,down:false,open:0,busy:false};
 function cbPaint(){$("#smC").classList.toggle("cur",CB.st==="C");$("#smA").classList.toggle("cur",CB.st==="A");$("#smS").classList.toggle("cur",CB.st==="S");
  [1,2,3].forEach(k=>$("#m"+k).classList.toggle("on",CB.f>=k));$("#cbDown").textContent=CB.down?"Levantar repartidores":"Tirar repartidores";}
